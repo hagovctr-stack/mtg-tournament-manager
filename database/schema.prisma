@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tournament {
+  id           String   @id @default(cuid())
+  name         String
+  format       String   @default("Swiss")
+  status       String   @default("REGISTRATION")
+  totalRounds  Int      @default(0)
+  currentRound Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  players   Player[]
+  rounds    Round[]
+  standings Standing[]
+}
+
+model Player {
+  id           String  @id @default(cuid())
+  name         String
+  dciNumber    String?
+  elo          Int     @default(1500)
+  active       Boolean @default(true)
+  tournamentId String
+
+  tournament  Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  matchesAsP1 Match[]    @relation("Player1")
+  matchesAsP2 Match[]    @relation("Player2")
+  byeMatches  Match[]    @relation("ByePlayer")
+  standing    Standing?
+
+  @@index([tournamentId])
+}
+
+model Round {
+  id           String    @id @default(cuid())
+  tournamentId String
+  number       Int
+  status       String    @default("PENDING")
+  startedAt    DateTime?
+  finishedAt   DateTime?
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  matches    Match[]
+
+  @@unique([tournamentId, number])
+  @@index([tournamentId])
+}
+
+model Match {
+  id           String  @id @default(cuid())
+  roundId      String
+  tournamentId String
+  tableNumber  Int
+  player1Id    String
+  player2Id    String?
+  byePlayerId  String?
+  wins1        Int?
+  wins2        Int?
+  draws        Int?
+  result       String  @default("PENDING")
+
+  round     Round   @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  player1   Player  @relation("Player1", fields: [player1Id], references: [id])
+  player2   Player? @relation("Player2", fields: [player2Id], references: [id])
+  byePlayer Player? @relation("ByePlayer", fields: [byePlayerId], references: [id])
+
+  @@index([roundId])
+  @@index([tournamentId])
+  @@index([player1Id])
+  @@index([player2Id])
+}
+
+model Standing {
+  id           String   @id @default(cuid())
+  tournamentId String
+  playerId     String   @unique
+  matchPoints  Int      @default(0)
+  gameWins     Int      @default(0)
+  gameLosses   Int      @default(0)
+  gameDraws    Int      @default(0)
+  matchWins    Int      @default(0)
+  matchLosses  Int      @default(0)
+  matchDraws   Int      @default(0)
+  omwPercent   Float    @default(0)
+  gwPercent    Float    @default(0)
+  ogwPercent   Float    @default(0)
+  rank         Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player     Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([tournamentId])
+}
