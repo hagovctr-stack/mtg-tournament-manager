@@ -1,0 +1,51 @@
+services:
+  # ── Backend API ─────────────────────────────────────────────────────────────
+  - type: web
+    name: mtg-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && node dist/server.js
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mtg-db
+          property: connectionString
+      - key: FRONTEND_URL
+        fromService:
+          name: mtg-frontend
+          type: web
+          property: host
+
+  # ── Frontend Static Site ─────────────────────────────────────────────────────
+  - type: web
+    name: mtg-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    plan: free
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: mtg-backend
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+          value: /api
+
+databases:
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  - name: mtg-db
+    plan: free
+    databaseName: mtg_tournament
+    user: mtg
