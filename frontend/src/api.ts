@@ -125,6 +125,7 @@ export interface Player {
   active: boolean;
   tournamentId: string;
   seatNumber: number | null;
+  avatarUrl: string | null;
 }
 
 export interface PlayerListItem {

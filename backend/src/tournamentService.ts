@@ -78,7 +78,7 @@ export async function getTournament(id: string) {
   const tournament = await prisma.tournament.findUnique({
     where: { id },
     include: {
-      players: { where: { active: true }, orderBy: { displayName: "asc" } },
+      players: { where: { active: true }, orderBy: { displayName: "asc" }, include: { player: { select: { avatarUrl: true } } } },
       rounds: {
         orderBy: { number: "asc" },
         include: {

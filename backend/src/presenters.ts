@@ -8,6 +8,7 @@ type EventPlayerLike = {
   currentElo: number;
   active: boolean;
   seatNumber?: number | null;
+  player?: { avatarUrl: string | null } | null;
 };
 
 type MatchLike = {
@@ -61,6 +62,7 @@ export function serializeEventPlayer(player: EventPlayerLike) {
     active: player.active,
     tournamentId: player.tournamentId,
     seatNumber: player.seatNumber ?? null,
+    avatarUrl: player.player?.avatarUrl ?? null,
   };
 }
 
