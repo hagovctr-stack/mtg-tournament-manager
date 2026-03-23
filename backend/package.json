@@ -5,11 +5,15 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "db:generate": "prisma generate",
+    "db:push": "prisma db push --schema ../database/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema ../database/schema.prisma",
+    "db:generate": "prisma generate --schema ../database/schema.prisma",
+    "db:backfill": "tsx scripts/backfillPersistentPlayers.ts",
+    "db:deploy": "npm run db:push && npm run db:backfill",
     "test": "vitest run",
-    "render-build": "npm install && npx prisma generate && npm run build"
+    "render-build": "npm install && npm run db:generate && npm run build",
+    "simulate:tournaments": "tsx scripts/simulateTournaments.ts",
+    "smoke:tournament": "tsx scripts/createSmokeTournament.ts"
   },
   "prisma": {
     "schema": "../database/schema.prisma"
@@ -19,11 +23,13 @@
     "cors": "^2.8.5",
     "express": "^4.18.3",
     "helmet": "^7.1.0",
+    "multer": "^2.1.1",
     "socket.io": "^4.7.4"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/multer": "^2.1.0",
     "@types/node": "^20.11.0",
     "prisma": "^5.10.0",
     "tsx": "^4.7.0",

@@ -26,7 +26,39 @@ cd mtg-tournament-manager
 docker compose -f docker/docker-compose.yml up --build
 ```
 
-Open **http://localhost** in your browser.
+Open **http://localhost:8080** in your browser.
+
+## Docker Development
+
+For hot reload during development, use the dev Compose file instead of the production one:
+
+```bash
+docker compose -f docker/docker-compose.dev.yml up
+```
+
+This runs:
+- Postgres in Docker
+- Backend with `tsx watch` on **http://localhost:3001**
+- Frontend with Vite HMR on **http://localhost:5173**
+
+Changes in `backend/`, `frontend/`, and `database/schema.prisma` are reflected without rebuilding the images.
+
+### DBCode / DB access
+
+The dev Compose stack exposes PostgreSQL on **localhost:5433** so you can inspect it from tools like DBCode.
+
+Use this connection:
+- Host: `localhost`
+- Port: `5433`
+- Database: `mtg_tournament`
+- Username: `mtg`
+- Password: `mtg_secret`
+
+Connection string:
+
+```bash
+postgresql://mtg:mtg_secret@localhost:5433/mtg_tournament
+```
 
 ---
 
