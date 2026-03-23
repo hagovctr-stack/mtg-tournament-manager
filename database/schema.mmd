@@ -1,0 +1,84 @@
+erDiagram
+    Tournament {
+        string id PK
+        string name
+        string format
+        string bestOfFormat
+        string status
+        int totalRounds
+        int currentRound
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    Player {
+        string id PK
+        string name
+        string normalizedName
+        string dciNumber UK
+        int rating
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    TournamentPlayer {
+        string id PK
+        string tournamentId FK
+        string playerId FK
+        string displayName
+        string displayDciNumber
+        int startingElo
+        int currentElo
+        boolean active
+    }
+
+    Round {
+        string id PK
+        string tournamentId FK
+        int number
+        string status
+        datetime startedAt
+        datetime finishedAt
+    }
+
+    Match {
+        string id PK
+        string roundId FK
+        string tournamentId FK
+        int tableNumber
+        string player1Id FK
+        string player2Id FK
+        string byePlayerId FK
+        int wins1
+        int wins2
+        int draws
+        string result
+    }
+
+    Standing {
+        string id PK
+        string tournamentId FK
+        string tournamentPlayerId FK
+        int matchPoints
+        int matchWins
+        int matchLosses
+        int matchDraws
+        int gameWins
+        int gameLosses
+        int gameDraws
+        float omwPercent
+        float gwPercent
+        float ogwPercent
+        int rank
+        datetime updatedAt
+    }
+
+    Tournament ||--o{ TournamentPlayer : "players"
+    Tournament ||--o{ Round : "rounds"
+    Tournament ||--o{ Standing : "standings"
+    Player ||--o{ TournamentPlayer : "linked profile"
+    Round ||--o{ Match : "matches"
+    TournamentPlayer ||--o{ Match : "as player1"
+    TournamentPlayer ||--o{ Match : "as player2"
+    TournamentPlayer ||--o| Match : "bye"
+    TournamentPlayer ||--|| Standing : "standing"

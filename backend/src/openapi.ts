@@ -638,15 +638,6 @@ export const openApiDocument = {
         },
         required: ["id", "name", "normalizedName", "rating", "createdAt", "updatedAt", "stats", "tournaments"],
       },
-      Top8Match: {
-        type: "object",
-        properties: {
-          match: { type: "integer" },
-          player1: { $ref: "#/components/schemas/Standing" },
-          player2: { $ref: "#/components/schemas/Standing" },
-        },
-        required: ["match", "player1", "player2"],
-      },
       CreateTournamentInput: {
         type: "object",
         properties: {
