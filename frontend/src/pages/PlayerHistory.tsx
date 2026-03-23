@@ -91,7 +91,24 @@ export function PlayerHistory() {
       <div>
         <Link to="/" className="text-sm text-blue-600 hover:underline">← Back</Link>
         <div className="mt-3 flex items-center gap-5">
-          <div className="shrink-0">
+          <label className="relative group cursor-pointer shrink-0" title="Upload photo">
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="sr-only"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file || !id) return;
+                try {
+                  const updated = await api.uploadPlayerAvatar(id, file);
+                  setSummary((prev) => prev ? { ...prev, ...updated } : prev);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Upload failed");
+                } finally {
+                  e.target.value = "";
+                }
+              }}
+            />
             <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100 flex items-center justify-center group-hover:border-blue-400 transition-colors">
               {summary.avatarUrl ? (
                 <img src={summary.avatarUrl} alt={summary.name} className="w-full h-full object-cover" />
@@ -101,7 +118,13 @@ export function PlayerHistory() {
                 </span>
               )}
             </div>
-          </div>
+            <div className="absolute inset-0 rounded-full bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+          </label>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{summary.name}</h1>
             <p className="mt-1 text-sm text-gray-500">

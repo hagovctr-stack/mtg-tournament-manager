@@ -1,7 +1,26 @@
 import { Router, Request, Response, NextFunction } from "express";
+import path from "path";
+import crypto from "crypto";
+import multer from "multer";
 import * as svc from "./tournamentService";
 import { getStandings, getStandingsAtRound } from "./standingsService";
 import { broadcast } from "./websocket";
+
+const uploadsDir = path.join(__dirname, "../uploads");
+
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: uploadsDir,
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase().replace(/[^.a-z0-9]/g, "");
+      cb(null, `${crypto.randomBytes(16).toString("hex")}${ext}`);
+    },
+  }),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    cb(null, ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.mimetype));
+  },
+});
 
 const router = Router();
 
@@ -77,6 +96,13 @@ router.delete("/players/:id/profile", wrap(async (req, res) => {
   } catch (err: any) {
     res.status(err.status ?? 400).json({ error: err.message });
   }
+}));
+
+router.post("/players/:id/avatar", avatarUpload.single("avatar"), wrap(async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No valid image file provided (max 2 MB, JPEG/PNG/WebP/GIF)" });
+  const avatarUrl = `/uploads/${req.file.filename}`;
+  const player = await svc.updatePlayerAvatar(req.params.id, avatarUrl);
+  res.json(player);
 }));
 
 router.get("/players/:id/summary", wrap(async (req, res) => {

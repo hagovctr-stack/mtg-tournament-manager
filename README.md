@@ -60,6 +60,19 @@ Connection string:
 postgresql://mtg:mtg_secret@localhost:5433/mtg_tournament
 ```
 
+### API docs
+
+The backend exposes an OpenAPI document at:
+
+```bash
+http://localhost:3001/docs
+```
+
+## Asset Attribution
+
+The planeswalker logo asset at [frontend/public/mtg-planeswalker.svg](/home/jansaldo/Documents/mtg-tournament-manager/frontend/public/mtg-planeswalker.svg) is based on "MTG (PW).svg" from Wikimedia Commons:
+https://commons.wikimedia.org/wiki/File:MTG_%28PW%29.svg
+
 ---
 
 ## Local development

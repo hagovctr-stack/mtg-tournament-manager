@@ -5,3 +5,6 @@ dist/
 .DS_Store
 *.log
 prisma/migrations/
+backend/uploads/*.png
+backend/uploads/*.jpg
+backend/uploads/*.jpeg
