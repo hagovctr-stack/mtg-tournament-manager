@@ -18,6 +18,12 @@ export function Pairings() {
   useEffect(() => { refresh(); }, [refresh]);
 
   useEffect(() => {
+    document.title = tournament
+      ? `Pairings | ${tournament.name} | MTG Tournament Manager`
+      : "Pairings | MTG Tournament Manager";
+  }, [tournament]);
+
+  useEffect(() => {
     if (!id) return;
     joinTournament(id);
     const socket = getSocket();
@@ -48,7 +54,7 @@ export function Pairings() {
 
       {currentRound?.status === "ACTIVE" && (
         <div className="mb-6 p-4 bg-white border border-gray-200 rounded-lg text-center">
-          <Timer durationMinutes={50} />
+          <Timer durationMinutes={50} storageKey={`round-timer-${currentRound.id}`} />
         </div>
       )}
 
