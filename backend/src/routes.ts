@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import * as svc from "./tournamentService";
-import { getStandings } from "./standingsService";
+import { getStandings, getStandingsAtRound } from "./standingsService";
 import { broadcast } from "./websocket";
 
 const router = Router();
@@ -10,9 +10,7 @@ const wrap =
   (req: Request, res: Response, next: NextFunction) =>
     fn(req, res).catch(next);
 
-// ─── Tournaments ──────────────────────────────────────────────────────────────
-
-router.get("/tournaments", wrap(async (req, res) => {
+router.get("/tournaments", wrap(async (_req, res) => {
   res.json(await svc.listTournaments());
 }));
 
@@ -21,24 +19,49 @@ router.post("/tournaments", wrap(async (req, res) => {
 }));
 
 router.get("/tournaments/:id", wrap(async (req, res) => {
-  const t = await svc.getTournament(req.params.id);
-  if (!t) return res.status(404).json({ error: "Not found" });
-  res.json(t);
+  const tournament = await svc.getTournament(req.params.id);
+  if (!tournament) return res.status(404).json({ error: "Not found" });
+  res.json(tournament);
 }));
 
 router.post("/tournaments/:id/start", wrap(async (req, res) => {
-  const t = await svc.startTournament(req.params.id);
+  const tournament = await svc.startTournament(req.params.id);
   broadcast(req.params.id, "round_started", { tournamentId: req.params.id });
-  res.json(t);
+  res.json(tournament);
 }));
 
 router.post("/tournaments/:id/finish", wrap(async (req, res) => {
-  const t = await svc.finishTournament(req.params.id);
+  const tournament = await svc.finishTournament(req.params.id);
   broadcast(req.params.id, "tournament_finished", { tournamentId: req.params.id });
+  res.json(tournament);
+}));
+
+router.delete("/tournaments/:id", wrap(async (req, res) => {
+  res.json(await svc.deleteTournament(req.params.id));
+}));
+
+router.patch("/tournaments/:id", wrap(async (req, res) => {
+  const t = await svc.updateTournament(req.params.id, req.body);
   res.json(t);
 }));
 
-// ─── Players ──────────────────────────────────────────────────────────────────
+router.post("/tournaments/:id/randomize-seats", wrap(async (req, res) => {
+  await svc.randomizeSeats(req.params.id);
+  const tournament = await svc.getTournament(req.params.id);
+  res.json(tournament);
+}));
+
+router.get("/players", wrap(async (_req, res) => {
+  res.json(await svc.listPlayers());
+}));
+
+router.post("/players", wrap(async (req, res) => {
+  try {
+    res.status(201).json(await svc.createPlayer(req.body, req.query.force === "true"));
+  } catch (err: any) {
+    res.status(err.status ?? 400).json({ error: err.message, code: err.code });
+  }
+}));
 
 router.post("/tournaments/:id/players", wrap(async (req, res) => {
   res.status(201).json(await svc.addPlayer(req.params.id, req.body));
@@ -48,7 +71,19 @@ router.delete("/players/:id", wrap(async (req, res) => {
   res.json(await svc.dropPlayer(req.params.id));
 }));
 
-// ─── Rounds ───────────────────────────────────────────────────────────────────
+router.delete("/players/:id/profile", wrap(async (req, res) => {
+  try {
+    res.json(await svc.deleteGlobalPlayer(req.params.id));
+  } catch (err: any) {
+    res.status(err.status ?? 400).json({ error: err.message });
+  }
+}));
+
+router.get("/players/:id/summary", wrap(async (req, res) => {
+  const player = await svc.getPlayerSummary(req.params.id);
+  if (!player) return res.status(404).json({ error: "Not found" });
+  res.json(player);
+}));
 
 router.post("/tournaments/:id/rounds", wrap(async (req, res) => {
   const round = await svc.generateNextRound(req.params.id);
@@ -56,8 +91,6 @@ router.post("/tournaments/:id/rounds", wrap(async (req, res) => {
   broadcast(req.params.id, "round_started", { round });
   res.status(201).json(round);
 }));
-
-// ─── Matches ──────────────────────────────────────────────────────────────────
 
 router.patch("/matches/:id/result", wrap(async (req, res) => {
   const match = await svc.reportResult(req.params.id, req.body);
@@ -67,27 +100,14 @@ router.patch("/matches/:id/result", wrap(async (req, res) => {
   res.json(match);
 }));
 
-// ─── Standings ────────────────────────────────────────────────────────────────
-
 router.get("/tournaments/:id/standings", wrap(async (req, res) => {
-  res.json(await getStandings(req.params.id));
+  const round = req.query.round ? parseInt(req.query.round as string, 10) : null;
+  if (round !== null && !Number.isNaN(round)) {
+    res.json(await getStandingsAtRound(req.params.id, round));
+  } else {
+    res.json(await getStandings(req.params.id));
+  }
 }));
-
-// ─── Top 8 ────────────────────────────────────────────────────────────────────
-
-router.get("/tournaments/:id/top8", wrap(async (req, res) => {
-  const standings = await getStandings(req.params.id);
-  const top8 = standings.slice(0, 8);
-  const bracket = [
-    { match: 1, player1: top8[0], player2: top8[7] },
-    { match: 2, player1: top8[3], player2: top8[4] },
-    { match: 3, player1: top8[1], player2: top8[6] },
-    { match: 4, player1: top8[2], player2: top8[5] },
-  ];
-  res.json(bracket);
-}));
-
-// ─── Export ───────────────────────────────────────────────────────────────────
 
 router.get("/tournaments/:id/export", wrap(async (req, res) => {
   const tournament = await svc.getTournament(req.params.id);
@@ -95,8 +115,8 @@ router.get("/tournaments/:id/export", wrap(async (req, res) => {
   const csv = [
     "Rank,Player,Points,OMW%,GW%,OGW%,W,L,D",
     ...standings.map(
-      (s) =>
-        `${s.rank},${s.player.name},${s.matchPoints},${(s.omwPercent * 100).toFixed(1)}%,${(s.gwPercent * 100).toFixed(1)}%,${(s.ogwPercent * 100).toFixed(1)}%,${s.matchWins},${s.matchLosses},${s.matchDraws}`
+      (standing: any) =>
+        `${standing.rank},${standing.player.name},${standing.matchPoints},${(standing.omwPercent * 100).toFixed(1)}%,${(standing.gwPercent * 100).toFixed(1)}%,${(standing.ogwPercent * 100).toFixed(1)}%,${standing.matchWins},${standing.matchLosses},${standing.matchDraws}`
     ),
   ].join("\n");
   res.setHeader("Content-Type", "text/csv");
@@ -104,9 +124,7 @@ router.get("/tournaments/:id/export", wrap(async (req, res) => {
   res.send(csv);
 }));
 
-// ─── Error handler ────────────────────────────────────────────────────────────
-
-router.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+router.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error("[API Error]", err.message);
   res.status(400).json({ error: err.message });
 });

@@ -40,10 +40,50 @@ export interface PairingResult {
   byePlayerId: string | null;
 }
 
+export interface SeatedPlayer {
+  id: string;
+  seatNumber: number;
+}
+
+export function generateSeatPairings(players: SeatedPlayer[]): PairingResult {
+  if (players.length === 0) {
+    return { pairings: [], byePlayerId: null };
+  }
+
+  const seated = [...players].sort((a, b) => a.seatNumber - b.seatNumber);
+  const pairings: Pairing[] = [];
+  let byePlayerId: string | null = null;
+  let tableNumber = 1;
+
+  const pairedPlayerCount = seated.length % 2 === 0 ? seated.length : seated.length - 1;
+  const halfway = pairedPlayerCount / 2;
+
+  for (let index = 0; index < halfway; index += 1) {
+    pairings.push({
+      player1Id: seated[index].id,
+      player2Id: seated[index + halfway].id,
+      tableNumber: tableNumber++,
+      isBye: false,
+    });
+  }
+
+  if (pairedPlayerCount !== seated.length) {
+    byePlayerId = seated[seated.length - 1].id;
+    pairings.push({
+      player1Id: byePlayerId,
+      player2Id: null,
+      tableNumber,
+      isBye: true,
+    });
+  }
+
+  return { pairings, byePlayerId };
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const MIN_OMW = 0.33;
-const MIN_GW = 0.33;
+const MIN_OMW = 1 / 3;
+const MIN_GW = 1 / 3;
 const MAX_BACKTRACK = 2000;
 
 // ─── Main entry point ────────────────────────────────────────────────────────
@@ -56,61 +96,30 @@ export function generatePairings(players: PlayerState[]): PairingResult {
   let byePlayerId: string | null = null;
   let activePlayers = [...players];
 
-  // BYE assignment: odd player count → lowest ranked without prior BYE
   if (activePlayers.length % 2 !== 0) {
     const byeCandidate = selectByePlayer(activePlayers);
     byePlayerId = byeCandidate.id;
     activePlayers = activePlayers.filter((p) => p.id !== byePlayerId);
   }
 
-  const brackets = buildScoreBrackets(activePlayers);
-  const pairedIds = new Set<string>();
-  const pairings: Pairing[] = [];
-  let tableNumber = 1;
-
-  const bracketKeys = Object.keys(brackets)
-    .map(Number)
-    .sort((a, b) => b - a);
-
-  let carryover: PlayerState[] = [];
-
-  for (const score of bracketKeys) {
-    const bracket = [...carryover, ...brackets[score]].filter(
-      (p) => !pairedIds.has(p.id)
-    );
-    carryover = [];
-
-    if (bracket.length === 0) continue;
-
-    const result = pairBracket(bracket, pairedIds);
-
-    for (const pair of result.paired) {
-      pairings.push({
-        player1Id: pair[0].id,
-        player2Id: pair[1].id,
-        tableNumber: tableNumber++,
-        isBye: false,
-      });
-      pairedIds.add(pair[0].id);
-      pairedIds.add(pair[1].id);
-    }
-
-    if (result.leftover) {
-      result.leftover.floatHistory.push(String(score));
-      carryover = [result.leftover];
-    }
+  const orderedPlayers = orderPlayersForSwiss(activePlayers);
+  const result = pairWithoutRematches(orderedPlayers, [], 0);
+  if (!result.success) {
+    throw new Error("Unable to generate non-rematch Swiss pairings for this round");
   }
 
-  if (carryover.length === 1 && byePlayerId === null) {
-    byePlayerId = carryover[0].id;
-    carryover = [];
-  }
+  const pairings: Pairing[] = result.pairs.map((pair, index) => ({
+    player1Id: pair[0].id,
+    player2Id: pair[1].id,
+    tableNumber: index + 1,
+    isBye: false,
+  }));
 
   if (byePlayerId) {
     pairings.push({
       player1Id: byePlayerId,
       player2Id: null,
-      tableNumber: tableNumber++,
+      tableNumber: pairings.length + 1,
       isBye: true,
     });
   }
@@ -156,100 +165,67 @@ function buildScoreBrackets(
   return brackets;
 }
 
-// ─── Bracket pairing with backtracking ───────────────────────────────────────
-
-interface BracketResult {
-  paired: [PlayerState, PlayerState][];
-  leftover: PlayerState | null;
-}
-
-function pairBracket(
-  bracket: PlayerState[],
-  alreadyPaired: Set<string>
-): BracketResult {
-  const available = bracket.filter((p) => !alreadyPaired.has(p.id));
-
-  if (available.length === 0) return { paired: [], leftover: null };
-  if (available.length === 1) return { paired: [], leftover: available[0] };
-
-  const result = backtrackPair(available, [], 0);
-
-  return {
-    paired: result.pairs,
-    leftover: result.leftover ?? null,
-  };
-}
+// ─── Strict no-rematch Swiss pairing ────────────────────────────────────────
 
 interface BacktrackResult {
   pairs: [PlayerState, PlayerState][];
-  leftover: PlayerState | undefined;
   success: boolean;
 }
 
-function backtrackPair(
+function orderPlayersForSwiss(players: PlayerState[]) {
+  const brackets = buildScoreBrackets(players);
+  return Object.keys(brackets)
+    .map(Number)
+    .sort((a, b) => b - a)
+    .flatMap((score) => brackets[score]);
+}
+
+function pairWithoutRematches(
   remaining: PlayerState[],
   currentPairs: [PlayerState, PlayerState][],
   iterations: number
 ): BacktrackResult {
-  if (iterations > MAX_BACKTRACK) {
-    return greedyPair(remaining, currentPairs);
-  }
-
   if (remaining.length === 0) {
-    return { pairs: currentPairs, leftover: undefined, success: true };
+    return { pairs: currentPairs, success: true };
   }
 
-  if (remaining.length === 1) {
-    return { pairs: currentPairs, leftover: remaining[0], success: true };
+  if (iterations > MAX_BACKTRACK) {
+    return { pairs: currentPairs, success: false };
   }
 
   const [first, ...rest] = remaining;
   const candidates = rankCandidates(first, rest);
 
   for (const candidate of candidates) {
-    const newRemaining = rest.filter((p) => p.id !== candidate.id);
-    const newPairs: [PlayerState, PlayerState][] = [
-      ...currentPairs,
-      [first, candidate],
-    ];
-
-    const result = backtrackPair(newRemaining, newPairs, iterations + 1);
+    const newRemaining = rest.filter((player) => player.id !== candidate.id);
+    const result = pairWithoutRematches(
+      newRemaining,
+      [...currentPairs, [first, candidate]],
+      iterations + 1
+    );
     if (result.success) return result;
   }
 
-  if (rest.length % 2 === 0) {
-    const result = backtrackPair(rest, currentPairs, iterations + 1);
-    if (result.success) return { ...result, leftover: first };
-  }
-
-  return { pairs: currentPairs, leftover: first, success: false };
+  return { pairs: currentPairs, success: false };
 }
 
 function rankCandidates(
   player: PlayerState,
   candidates: PlayerState[]
 ): PlayerState[] {
-  const nonRematches = candidates.filter(
-    (c) => !player.opponents.includes(c.id)
-  );
-  const rematches = candidates.filter((c) => player.opponents.includes(c.id));
-  return [...nonRematches, ...rematches];
-}
-
-function greedyPair(
-  remaining: PlayerState[],
-  currentPairs: [PlayerState, PlayerState][]
-): BacktrackResult {
-  const pairs: [PlayerState, PlayerState][] = [...currentPairs];
-  const list = [...remaining];
-  let leftover: PlayerState | undefined;
-
-  while (list.length >= 2) {
-    pairs.push([list.shift()!, list.shift()!]);
-  }
-  if (list.length === 1) leftover = list[0];
-
-  return { pairs, leftover, success: true };
+  return candidates
+    .filter((candidate) => !player.opponents.includes(candidate.id))
+    .sort((left, right) => {
+      const pointDiff =
+        Math.abs(player.matchPoints - left.matchPoints) -
+        Math.abs(player.matchPoints - right.matchPoints);
+      if (pointDiff !== 0) return pointDiff;
+      if (left.matchPoints !== right.matchPoints) return right.matchPoints - left.matchPoints;
+      if (left.tiebreaker1 !== right.tiebreaker1) return right.tiebreaker1 - left.tiebreaker1;
+      if (left.tiebreaker2 !== right.tiebreaker2) return right.tiebreaker2 - left.tiebreaker2;
+      if (left.tiebreaker3 !== right.tiebreaker3) return right.tiebreaker3 - left.tiebreaker3;
+      return left.name.localeCompare(right.name);
+    });
 }
 
 // ─── Tiebreaker calculation ───────────────────────────────────────────────────
@@ -271,7 +247,7 @@ export function calculateTiebreakers(
 
   const matchWinPct = new Map<string, number>();
   for (const player of players) {
-    matchWinPct.set(player.id, calcMatchWinPct(player, allMatches));
+    matchWinPct.set(player.id, calcMatchWinPct(player.id, allMatches));
   }
 
   const gameWinPct = new Map<string, number>();
@@ -290,7 +266,7 @@ export function calculateTiebreakers(
           ) / opponents.length
         : 0;
 
-    const gw = gameWinPct.get(player.id) ?? 0;
+    const gw = gameWinPct.get(player.id) ?? MIN_GW;
 
     const ogw =
       opponents.length > 0
@@ -300,48 +276,41 @@ export function calculateTiebreakers(
           ) / opponents.length
         : 0;
 
-    result.set(player.id, {
-      omw: Math.max(omw, opponents.length > 0 ? MIN_OMW : 0),
-      gw: Math.max(gw, MIN_GW),
-      ogw: Math.max(ogw, opponents.length > 0 ? MIN_GW : 0),
-    });
+    result.set(player.id, { omw, gw, ogw });
   }
 
   return result;
 }
 
-function calcMatchWinPct(
-  player: PlayerState,
-  allMatches: MatchRecord[]
-): number {
-  const matches = allMatches.filter(
-    (m) => m.playerId === player.id && !m.isBye
-  );
+function calcMatchWinPct(playerId: string, allMatches: MatchRecord[]): number {
+  const matches = allMatches.filter((m) => m.playerId === playerId);
   if (matches.length === 0) return MIN_OMW;
 
-  const points = matches.reduce((sum, m) => {
-    if (m.playerWins > m.opponentWins) return sum + 3;
-    if (m.draws > 0) return sum + 1;
+  const matchPoints = matches.reduce((sum, match) => {
+    if (match.playerWins > match.opponentWins) return sum + 3;
+    if (match.playerWins === match.opponentWins) return sum + 1;
     return sum;
   }, 0);
 
-  return Math.max(points / (matches.length * 3), MIN_OMW);
+  return Math.max(matchPoints / (matches.length * 3), MIN_OMW);
 }
 
 function calcGameWinPct(playerId: string, allMatches: MatchRecord[]): number {
-  const matches = allMatches.filter(
-    (m) => m.playerId === playerId && !m.isBye
-  );
+  const matches = allMatches.filter((m) => m.playerId === playerId);
   if (matches.length === 0) return MIN_GW;
 
   const totalGames = matches.reduce(
-    (sum, m) => sum + m.playerWins + m.opponentWins + m.draws,
+    (sum, match) => sum + match.playerWins + match.opponentWins + match.draws,
     0
   );
-  const totalWins = matches.reduce((sum, m) => sum + m.playerWins, 0);
-
   if (totalGames === 0) return MIN_GW;
-  return Math.max(totalWins / totalGames, MIN_GW);
+
+  const gamePoints = matches.reduce(
+    (sum, match) => sum + match.playerWins * 3 + match.draws,
+    0
+  );
+
+  return Math.max(gamePoints / (totalGames * 3), MIN_GW);
 }
 
 // ─── Recommended rounds ───────────────────────────────────────────────────────

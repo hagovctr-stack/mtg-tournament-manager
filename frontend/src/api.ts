@@ -1,5 +1,13 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3001/api";
 
+class ApiError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
@@ -8,36 +16,92 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error ?? "Request failed");
+    throw new ApiError(err.error ?? "Request failed", err.code);
   }
   return res.json();
 }
 
 export const api = {
   listTournaments: () => request<Tournament[]>("GET", "/tournaments"),
+  listPlayers: () => request<PlayerListItem[]>("GET", "/players"),
+  createPlayer: (data: AddPlayerInput, force = false) =>
+    request<PlayerListItem>("POST", `/players${force ? "?force=true" : ""}`, data),
   createTournament: (data: CreateTournamentInput) => request<Tournament>("POST", "/tournaments", data),
   getTournament: (id: string) => request<TournamentDetail>("GET", `/tournaments/${id}`),
   startTournament: (id: string) => request<Tournament>("POST", `/tournaments/${id}/start`),
   finishTournament: (id: string) => request<Tournament>("POST", `/tournaments/${id}/finish`),
+  deleteTournament: (id: string) => request<{ id: string; name: string }>("DELETE", `/tournaments/${id}`),
   addPlayer: (tournamentId: string, data: AddPlayerInput) =>
     request<Player>("POST", `/tournaments/${tournamentId}/players`, data),
   dropPlayer: (playerId: string) => request<Player>("DELETE", `/players/${playerId}`),
+  deletePlayer: (playerId: string) => request<{ id: string }>("DELETE", `/players/${playerId}/profile`),
+  uploadPlayerAvatar: (playerId: string, file: File) => {
+    const form = new FormData();
+    form.append("avatar", file);
+    return fetch(`${BASE_URL}/players/${playerId}/avatar`, { method: "POST", body: form })
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: res.statusText }));
+          throw new ApiError(err.error ?? "Upload failed", err.code);
+        }
+        return res.json() as Promise<PlayerListItem>;
+      });
+  },
+  getPlayerSummary: (playerId: string) => request<PlayerSummary>("GET", `/players/${playerId}/summary`),
   generateRound: (tournamentId: string) => request<Round>("POST", `/tournaments/${tournamentId}/rounds`),
   reportResult: (matchId: string, data: ReportResultInput) =>
     request<Match>("PATCH", `/matches/${matchId}/result`, data),
-  getStandings: (tournamentId: string) => request<Standing[]>("GET", `/tournaments/${tournamentId}/standings`),
-  getTop8: (tournamentId: string) => request<Top8Bracket[]>("GET", `/tournaments/${tournamentId}/top8`),
+  getStandings: (tournamentId: string, round?: number) =>
+    request<Standing[]>("GET", `/tournaments/${tournamentId}/standings${round !== undefined ? `?round=${round}` : ""}`),
+  updateTournament: (id: string, data: UpdateTournamentInput) =>
+    request<Tournament>("PATCH", `/tournaments/${id}`, data),
+  randomizeSeats: (id: string) => request<TournamentDetail>("POST", `/tournaments/${id}/randomize-seats`),
   exportCSV: (tournamentId: string) => {
     window.open(`${BASE_URL}/tournaments/${tournamentId}/export`, "_blank");
   },
 };
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+export interface PlayerStats {
+  tournamentsPlayed: number;
+  activeRegistrations: number;
+  trophies: number;
+  matchWins: number;
+  matchLosses: number;
+  matchDraws: number;
+  gameWins: number;
+  gameLosses: number;
+  gameDraws: number;
+  matchWinRate: number;
+  gameWinRate: number;
+  lastTournamentAt: string | null;
+}
+
+export interface PlayerTournamentHistoryEntry {
+  tournamentId: string;
+  tournamentPlayerId: string;
+  name: string;
+  status: "REGISTRATION" | "ACTIVE" | "FINISHED";
+  playedAt: string;
+  displayName: string;
+  displayDciNumber: string | null;
+  startingElo: number;
+  currentElo: number;
+  endingElo: number | null;
+  active: boolean;
+  rank: number | null;
+  matchPoints: number;
+  matchWins: number;
+  matchLosses: number;
+  matchDraws: number;
+}
 
 export interface Tournament {
   id: string;
   name: string;
   format: string;
+  subtitle: string;
+  cubeCobraUrl: string | null;
+  bestOfFormat: string;
   status: "REGISTRATION" | "ACTIVE" | "FINISHED";
   totalRounds: number;
   currentRound: number;
@@ -53,11 +117,26 @@ export interface TournamentDetail extends Tournament {
 
 export interface Player {
   id: string;
+  tournamentPlayerId: string;
+  playerId: string | null;
   name: string;
   dciNumber?: string;
   elo: number;
   active: boolean;
   tournamentId: string;
+  seatNumber: number | null;
+}
+
+export interface PlayerListItem {
+  id: string;
+  name: string;
+  normalizedName: string;
+  dciNumber?: string | null;
+  rating: number;
+  avatarUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+  stats: PlayerStats;
 }
 
 export interface Round {
@@ -91,6 +170,9 @@ export interface MatchDetail extends Match {
 
 export interface Standing {
   id: string;
+  tournamentId: string;
+  tournamentPlayerId: string;
+  playerId: string | null;
   rank: number;
   matchPoints: number;
   matchWins: number;
@@ -104,15 +186,20 @@ export interface Standing {
   player: Player;
 }
 
-export interface Top8Bracket {
-  match: number;
-  player1: Standing;
-  player2: Standing;
-}
-
 export interface CreateTournamentInput {
   name: string;
   format?: string;
+  subtitle?: string;
+  cubeCobraUrl?: string;
+  bestOfFormat?: string;
+  totalRounds?: number;
+}
+
+export interface UpdateTournamentInput {
+  name?: string;
+  format?: string;
+  subtitle?: string;
+  cubeCobraUrl?: string | null;
   totalRounds?: number;
 }
 
@@ -126,4 +213,8 @@ export interface ReportResultInput {
   wins1: number;
   wins2: number;
   draws: number;
+}
+
+export interface PlayerSummary extends PlayerListItem {
+  tournaments: PlayerTournamentHistoryEntry[];
 }

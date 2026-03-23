@@ -10,33 +10,57 @@ datasource db {
 model Tournament {
   id           String   @id @default(cuid())
   name         String
-  format       String   @default("Swiss")
+  format       String   @default("Cube")
+  bestOfFormat String   @default("BO3")
+  subtitle     String   @default("")
+  cubeCobraUrl String?
   status       String   @default("REGISTRATION")
   totalRounds  Int      @default(0)
   currentRound Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  players   Player[]
+  players   TournamentPlayer[]
   rounds    Round[]
   standings Standing[]
 }
 
 model Player {
-  id           String  @id @default(cuid())
-  name         String
-  dciNumber    String?
-  elo          Int     @default(1500)
-  active       Boolean @default(true)
-  tournamentId String
+  id              String             @id @default(cuid())
+  name            String
+  normalizedName  String
+  dciNumber       String?            @unique
+  rating          Int                @default(1500)
+  avatarUrl       String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  tournaments     TournamentPlayer[]
 
-  tournament  Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  matchesAsP1 Match[]    @relation("Player1")
-  matchesAsP2 Match[]    @relation("Player2")
-  byeMatches  Match[]    @relation("ByePlayer")
+  @@index([normalizedName])
+}
+
+model TournamentPlayer {
+  id               String    @id @default(cuid())
+  tournamentId     String
+  playerId         String?
+  displayName      String    @map("name")
+  displayDciNumber String?   @map("dciNumber")
+  startingElo      Int       @default(1500) @map("elo")
+  currentElo       Int       @default(1500)
+  active           Boolean   @default(true)
+  seatNumber       Int?
+
+  tournament  Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player      Player?     @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  matchesAsP1 Match[]     @relation("Player1")
+  matchesAsP2 Match[]     @relation("Player2")
+  byeMatches  Match[]     @relation("ByePlayer")
   standing    Standing?
 
   @@index([tournamentId])
+  @@index([playerId])
+  @@index([tournamentId, playerId])
+  @@map("TournamentPlayer")
 }
 
 model Round {
@@ -55,48 +79,48 @@ model Round {
 }
 
 model Match {
-  id           String  @id @default(cuid())
-  roundId      String
-  tournamentId String
-  tableNumber  Int
-  player1Id    String
-  player2Id    String?
-  byePlayerId  String?
-  wins1        Int?
-  wins2        Int?
-  draws        Int?
-  result       String  @default("PENDING")
+  id                        String  @id @default(cuid())
+  roundId                   String
+  tournamentId              String
+  tableNumber               Int
+  player1TournamentPlayerId String  @map("player1Id")
+  player2TournamentPlayerId String? @map("player2Id")
+  byeTournamentPlayerId     String? @map("byePlayerId")
+  wins1                     Int?
+  wins2                     Int?
+  draws                     Int?
+  result                    String  @default("PENDING")
 
-  round     Round   @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  player1   Player  @relation("Player1", fields: [player1Id], references: [id])
-  player2   Player? @relation("Player2", fields: [player2Id], references: [id])
-  byePlayer Player? @relation("ByePlayer", fields: [byePlayerId], references: [id])
+  round     Round             @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  player1   TournamentPlayer  @relation("Player1", fields: [player1TournamentPlayerId], references: [id])
+  player2   TournamentPlayer? @relation("Player2", fields: [player2TournamentPlayerId], references: [id])
+  byePlayer TournamentPlayer? @relation("ByePlayer", fields: [byeTournamentPlayerId], references: [id])
 
   @@index([roundId])
   @@index([tournamentId])
-  @@index([player1Id])
-  @@index([player2Id])
+  @@index([player1TournamentPlayerId])
+  @@index([player2TournamentPlayerId])
 }
 
 model Standing {
-  id           String   @id @default(cuid())
-  tournamentId String
-  playerId     String   @unique
-  matchPoints  Int      @default(0)
-  gameWins     Int      @default(0)
-  gameLosses   Int      @default(0)
-  gameDraws    Int      @default(0)
-  matchWins    Int      @default(0)
-  matchLosses  Int      @default(0)
-  matchDraws   Int      @default(0)
-  omwPercent   Float    @default(0)
-  gwPercent    Float    @default(0)
-  ogwPercent   Float    @default(0)
-  rank         Int      @default(0)
-  updatedAt    DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  tournamentId       String
+  tournamentPlayerId String   @unique @map("playerId")
+  matchPoints        Int      @default(0)
+  gameWins           Int      @default(0)
+  gameLosses         Int      @default(0)
+  gameDraws          Int      @default(0)
+  matchWins          Int      @default(0)
+  matchLosses        Int      @default(0)
+  matchDraws         Int      @default(0)
+  omwPercent         Float    @default(0)
+  gwPercent          Float    @default(0)
+  ogwPercent         Float    @default(0)
+  rank               Int      @default(0)
+  updatedAt          DateTime @updatedAt
 
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  player     Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  tournament       Tournament       @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournamentPlayer TournamentPlayer @relation(fields: [tournamentPlayerId], references: [id], onDelete: Cascade)
 
   @@index([tournamentId])
 }
