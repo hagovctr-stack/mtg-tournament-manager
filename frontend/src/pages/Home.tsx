@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { api, type AddPlayerInput, type PlayerListItem, type Tournament, type CreateTournamentInput } from "../api";
 
 type Section = "tournaments" | "players";
@@ -62,7 +62,10 @@ function getPlayerSortValue(player: PlayerListItem, key: PlayerSortKey) {
 }
 
 export function Home() {
-  const [section, setSection] = useState<Section>("tournaments");
+  const location = useLocation();
+  const [section, setSection] = useState<Section>(
+    (location.state as any)?.section === "players" ? "players" : "tournaments"
+  );
   const [createMode, setCreateMode] = useState<CreateMode>(null);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [players, setPlayers] = useState<PlayerListItem[]>([]);
@@ -652,8 +655,8 @@ export function Home() {
                   pagedPlayers.map((player) => (
                     <tr key={player.id} className="border-t border-gray-100 hover:bg-gray-50">
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center shrink-0">
+                        <Link to={`/players/${player.id}`} className="flex items-center gap-3 group">
+                          <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center shrink-0 group-hover:ring-2 group-hover:ring-blue-100 transition-all">
                             {player.avatarUrl ? (
                               <img src={player.avatarUrl} alt={player.name} className="w-full h-full object-cover" />
                             ) : (
@@ -661,10 +664,10 @@ export function Home() {
                             )}
                           </div>
                           <div>
-                            <p className="font-semibold text-gray-800">{player.name}</p>
+                            <p className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">{player.name}</p>
                             <p className="text-xs text-gray-400">{player.dciNumber ?? "No DCI"}</p>
                           </div>
-                        </div>
+                        </Link>
                       </td>
                       <td className="px-4 py-3 font-semibold text-gray-900">{player.rating}</td>
                       <td className="px-4 py-3 text-gray-600">{player.stats.tournamentsPlayed}</td>

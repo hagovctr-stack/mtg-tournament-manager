@@ -76,7 +76,7 @@ export function PlayerHistory() {
   if (!summary) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-10">
-        <Link to="/" className="text-sm text-blue-600 hover:underline">← Back</Link>
+        <Link to="/" state={{ section: "players" }} className="text-sm text-blue-600 hover:underline">← Back</Link>
         <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
           {error || "Player not found"}
         </div>
@@ -89,7 +89,7 @@ export function PlayerHistory() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       <div>
-        <Link to="/" className="text-sm text-blue-600 hover:underline">← Back</Link>
+        <Link to="/" state={{ section: "players" }} className="text-sm text-blue-600 hover:underline">← Back</Link>
         <div className="mt-3 flex items-center gap-5">
           <label className="relative group cursor-pointer shrink-0" title="Upload photo">
             <input
