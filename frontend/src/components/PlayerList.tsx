@@ -147,8 +147,7 @@ export function PlayerList({ tournamentId, players, canEdit, onUpdate }: PlayerL
         <table className="min-w-full text-sm">
           <thead>
             <tr className="bg-gray-100 text-gray-600 uppercase text-xs">
-              <th className="px-4 py-2 text-left">#</th>
-              {hasSeatAssignments && <th className="px-4 py-2 text-left">Seat</th>}
+              <th className="px-4 py-2 text-left">{hasSeatAssignments ? "Seat" : "#"}</th>
               <th className="px-4 py-2 text-left">Name</th>
               <th className="px-4 py-2 text-left">DCI</th>
               <th className="px-4 py-2 text-left">ELO</th>
@@ -158,10 +157,7 @@ export function PlayerList({ tournamentId, players, canEdit, onUpdate }: PlayerL
           <tbody>
             {visiblePlayers.map((player, index) => (
               <tr key={player.id} className="border-t border-gray-100 hover:bg-gray-50">
-                <td className="px-4 py-2 text-gray-400">{index + 1}</td>
-                {hasSeatAssignments && (
-                  <td className="px-4 py-2 text-gray-500">{player.seatNumber ?? "—"}</td>
-                )}
+                <td className="px-4 py-2 text-gray-400">{hasSeatAssignments ? (player.seatNumber ?? "—") : index + 1}</td>
                 <td className="px-4 py-2 font-medium text-gray-800">
                   {player.playerId ? (
                     <Link to={`/players/${player.playerId}`} className="hover:text-blue-600 hover:underline">

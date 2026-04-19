@@ -78,7 +78,7 @@ export async function getTournament(id: string) {
   const tournament = await prisma.tournament.findUnique({
     where: { id },
     include: {
-      players: { where: { active: true }, orderBy: { displayName: "asc" }, include: { player: { select: { avatarUrl: true } } } },
+      players: { where: { active: true }, orderBy: [{ seatNumber: "asc" }, { id: "asc" }], include: { player: { select: { avatarUrl: true } } } },
       rounds: {
         orderBy: { number: "asc" },
         include: {
@@ -186,6 +186,12 @@ export async function addPlayer(
   const name = data.name.trim();
   const dciNumber = normalizeDciNumber(data.dciNumber);
   const normalizedName = normalizeName(name);
+
+  const existingByName = await prisma.tournamentPlayer.findFirst({
+    where: { tournamentId, active: true, displayName: { equals: name, mode: "insensitive" } },
+  });
+  if (existingByName) throw new Error("Player already added to this tournament");
+
   let matchedByNameFallback = false;
 
   let player = dciNumber ? await prisma.player.findUnique({ where: { dciNumber } }) : null;
