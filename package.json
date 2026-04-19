@@ -1,5 +1,9 @@
 {
+  "scripts": {
+    "format": "prettier --write ."
+  },
   "devDependencies": {
+    "prettier": "^3.8.3",
     "prisma": "^5.22.0"
   },
   "dependencies": {
