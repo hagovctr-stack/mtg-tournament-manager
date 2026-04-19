@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface TimerState {
-  phase: "idle" | "running" | "paused";
-  startedAt: number | null;      // epoch ms when last started/resumed
+  phase: 'idle' | 'running' | 'paused';
+  startedAt: number | null; // epoch ms when last started/resumed
   pausedSecondsLeft: number | null; // seconds remaining when paused
 }
 
@@ -36,29 +36,33 @@ export function Timer({ durationMinutes = 50, storageKey, onExpire }: TimerProps
 
   const computeSecondsLeft = useCallback(
     (state: TimerState): number => {
-      if (state.phase === "running" && state.startedAt !== null) {
+      if (state.phase === 'running' && state.startedAt !== null) {
         const elapsed = Math.floor((Date.now() - state.startedAt) / 1000);
         return Math.max(0, totalSeconds - elapsed);
       }
-      if (state.phase === "paused" && state.pausedSecondsLeft !== null) {
+      if (state.phase === 'paused' && state.pausedSecondsLeft !== null) {
         return state.pausedSecondsLeft;
       }
       return totalSeconds;
     },
-    [totalSeconds]
+    [totalSeconds],
   );
 
   const [timerState, setTimerStateRaw] = useState<TimerState>(() => {
     const saved = loadState(storageKey);
-    return saved ?? { phase: "idle", startedAt: null, pausedSecondsLeft: null };
+    return saved ?? { phase: 'idle', startedAt: null, pausedSecondsLeft: null };
   });
 
-  const [secondsLeft, setSecondsLeft] = useState(() => computeSecondsLeft(
-    loadState(storageKey) ?? { phase: "idle", startedAt: null, pausedSecondsLeft: null }
-  ));
+  const [secondsLeft, setSecondsLeft] = useState(() =>
+    computeSecondsLeft(
+      loadState(storageKey) ?? { phase: 'idle', startedAt: null, pausedSecondsLeft: null },
+    ),
+  );
 
   const onExpireRef = useRef(onExpire);
-  useEffect(() => { onExpireRef.current = onExpire; }, [onExpire]);
+  useEffect(() => {
+    onExpireRef.current = onExpire;
+  }, [onExpire]);
 
   const setTimerState = useCallback(
     (next: TimerState) => {
@@ -66,18 +70,18 @@ export function Timer({ durationMinutes = 50, storageKey, onExpire }: TimerProps
       saveState(storageKey, next);
       setSecondsLeft(computeSecondsLeft(next));
     },
-    [storageKey, computeSecondsLeft]
+    [storageKey, computeSecondsLeft],
   );
 
   // Tick while running
   useEffect(() => {
-    if (timerState.phase !== "running") return;
+    if (timerState.phase !== 'running') return;
     const interval = setInterval(() => {
       const remaining = computeSecondsLeft(timerState);
       setSecondsLeft(remaining);
       if (remaining <= 0) {
         clearInterval(interval);
-        const next: TimerState = { phase: "idle", startedAt: null, pausedSecondsLeft: null };
+        const next: TimerState = { phase: 'idle', startedAt: null, pausedSecondsLeft: null };
         setTimerStateRaw(next);
         saveState(storageKey, next);
         onExpireRef.current?.();
@@ -87,23 +91,23 @@ export function Timer({ durationMinutes = 50, storageKey, onExpire }: TimerProps
   }, [timerState, computeSecondsLeft, storageKey]);
 
   const handleStartPause = useCallback(() => {
-    if (timerState.phase === "running") {
+    if (timerState.phase === 'running') {
       // Pause
       const remaining = computeSecondsLeft(timerState);
-      setTimerState({ phase: "paused", startedAt: null, pausedSecondsLeft: remaining });
+      setTimerState({ phase: 'paused', startedAt: null, pausedSecondsLeft: remaining });
     } else {
       // Start or resume from paused/idle
       const resumingFrom =
-        timerState.phase === "paused" && timerState.pausedSecondsLeft !== null
+        timerState.phase === 'paused' && timerState.pausedSecondsLeft !== null
           ? timerState.pausedSecondsLeft
           : totalSeconds;
       const startedAt = Date.now() - (totalSeconds - resumingFrom) * 1000;
-      setTimerState({ phase: "running", startedAt, pausedSecondsLeft: null });
+      setTimerState({ phase: 'running', startedAt, pausedSecondsLeft: null });
     }
   }, [timerState, computeSecondsLeft, setTimerState, totalSeconds]);
 
   const handleReset = useCallback(() => {
-    const next: TimerState = { phase: "idle", startedAt: null, pausedSecondsLeft: null };
+    const next: TimerState = { phase: 'idle', startedAt: null, pausedSecondsLeft: null };
     setTimerState(next);
   }, [setTimerState]);
 
@@ -111,29 +115,25 @@ export function Timer({ durationMinutes = 50, storageKey, onExpire }: TimerProps
   const seconds = secondsLeft % 60;
   const isWarning = secondsLeft <= 300 && secondsLeft > 0;
   const isExpired = secondsLeft === 0;
-  const running = timerState.phase === "running";
+  const running = timerState.phase === 'running';
 
   return (
     <div className="flex flex-col items-center gap-3">
       <div
         className={`font-mono text-5xl font-bold tabular-nums ${
-          isExpired
-            ? "text-red-600"
-            : isWarning
-            ? "text-amber-500 animate-pulse"
-            : "text-gray-800"
+          isExpired ? 'text-red-600' : isWarning ? 'text-amber-500 animate-pulse' : 'text-gray-800'
         }`}
       >
-        {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
       </div>
       <div className="flex gap-2">
         <button
           onClick={handleStartPause}
           className={`px-4 py-2 rounded text-white font-semibold text-sm ${
-            running ? "bg-amber-500 hover:bg-amber-600" : "bg-green-600 hover:bg-green-700"
+            running ? 'bg-amber-500 hover:bg-amber-600' : 'bg-green-600 hover:bg-green-700'
           }`}
         >
-          {running ? "Pause" : "Start"}
+          {running ? 'Pause' : 'Start'}
         </button>
         <button
           onClick={handleReset}

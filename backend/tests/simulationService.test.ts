@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { generateSeatPairings, recommendedRounds } from "../src/pairingAlgorithm";
-import { MAX_TOURNAMENT_PLAYERS } from "../src/tournamentRules";
-import { replayTournamentElo } from "../src/eloService";
+import { describe, expect, it } from 'vitest';
+import { generateSeatPairings, recommendedRounds } from '../src/pairingAlgorithm';
+import { MAX_TOURNAMENT_PLAYERS } from '../src/tournamentRules';
+import { replayTournamentElo } from '../src/eloService';
 import {
   MAX_DRAFT_POD_PLAYERS,
   SIMULATION_PLAYER_POOL,
@@ -26,7 +26,7 @@ import {
   type SimulationRound,
   type SimulationRuntime,
   validatePersistedTournamentRatings,
-} from "../src/simulationService";
+} from '../src/simulationService';
 
 type FakePlayer = {
   id: string;
@@ -50,7 +50,7 @@ type FakeMatch = {
   tableNumber: number;
   player1RegistrationId: string;
   player2RegistrationId: string | null;
-  result: "PENDING" | "P1_WIN" | "P2_WIN" | "DRAW" | "BYE";
+  result: 'PENDING' | 'P1_WIN' | 'P2_WIN' | 'DRAW' | 'BYE';
   wins1: number | null;
   wins2: number | null;
   draws: number | null;
@@ -64,7 +64,7 @@ type FakeTournament = {
   createdAt: string;
   totalRounds: number;
   currentRound: number;
-  status: "REGISTRATION" | "ACTIVE" | "FINISHED";
+  status: 'REGISTRATION' | 'ACTIVE' | 'FINISHED';
   registrations: FakeRegistration[];
   rounds: Array<{
     number: number;
@@ -106,7 +106,11 @@ class FakeSimulationRuntime implements SimulationRuntime {
     });
   }
 
-  async createTournament(input: { name: string; format: TournamentFormat; bestOfFormat: BestOfFormat }) {
+  async createTournament(input: {
+    name: string;
+    format: TournamentFormat;
+    bestOfFormat: BestOfFormat;
+  }) {
     const tournament: FakeTournament = {
       id: `tournament-${this.nextTournamentId++}`,
       name: input.name,
@@ -115,7 +119,7 @@ class FakeSimulationRuntime implements SimulationRuntime {
       createdAt: new Date(Date.UTC(2026, 0, this.tournaments.length + 1)).toISOString(),
       totalRounds: 0,
       currentRound: 0,
-      status: "REGISTRATION",
+      status: 'REGISTRATION',
       registrations: [],
       rounds: [],
     };
@@ -140,7 +144,7 @@ class FakeSimulationRuntime implements SimulationRuntime {
 
   async startTournament(tournamentId: string) {
     const tournament = this.getTournamentOrThrow(tournamentId);
-    tournament.status = "ACTIVE";
+    tournament.status = 'ACTIVE';
     tournament.totalRounds = recommendedRounds(tournament.registrations.length);
     return { id: tournament.id, totalRounds: tournament.totalRounds };
   }
@@ -172,7 +176,7 @@ class FakeSimulationRuntime implements SimulationRuntime {
         tournament.registrations.map((registration) => ({
           id: registration.id,
           seatNumber: registration.seatNumber!,
-        }))
+        })),
       );
 
       for (const pairing of pairings) {
@@ -181,7 +185,7 @@ class FakeSimulationRuntime implements SimulationRuntime {
           tableNumber: pairing.tableNumber,
           player1RegistrationId: pairing.player1Id,
           player2RegistrationId: pairing.player2Id,
-          result: pairing.isBye ? "BYE" : "PENDING",
+          result: pairing.isBye ? 'BYE' : 'PENDING',
           wins1: pairing.isBye ? 2 : null,
           wins2: pairing.isBye ? 0 : null,
           draws: pairing.isBye ? 0 : null,
@@ -189,9 +193,10 @@ class FakeSimulationRuntime implements SimulationRuntime {
       }
     } else {
       const orderedRegistrations = [...tournament.registrations].sort((left, right) =>
-        left.displayName.localeCompare(right.displayName)
+        left.displayName.localeCompare(right.displayName),
       );
-      const rotation = orderedRegistrations.length === 0 ? 0 : (number - 1) % orderedRegistrations.length;
+      const rotation =
+        orderedRegistrations.length === 0 ? 0 : (number - 1) % orderedRegistrations.length;
       const rotated = orderedRegistrations
         .slice(rotation)
         .concat(orderedRegistrations.slice(0, rotation));
@@ -206,7 +211,7 @@ class FakeSimulationRuntime implements SimulationRuntime {
             tableNumber,
             player1RegistrationId: player1.id,
             player2RegistrationId: null,
-            result: "BYE",
+            result: 'BYE',
             wins1: 2,
             wins2: 0,
             draws: 0,
@@ -217,7 +222,7 @@ class FakeSimulationRuntime implements SimulationRuntime {
             tableNumber,
             player1RegistrationId: player1.id,
             player2RegistrationId: player2.id,
-            result: "PENDING",
+            result: 'PENDING',
             wins1: null,
             wins2: null,
             draws: null,
@@ -235,7 +240,9 @@ class FakeSimulationRuntime implements SimulationRuntime {
         id: match.id,
         tableNumber: match.tableNumber,
         result: match.result,
-        player1: { name: this.getRegistration(tournament, match.player1RegistrationId).displayName },
+        player1: {
+          name: this.getRegistration(tournament, match.player1RegistrationId).displayName,
+        },
         player2: match.player2RegistrationId
           ? { name: this.getRegistration(tournament, match.player2RegistrationId).displayName }
           : null,
@@ -248,9 +255,9 @@ class FakeSimulationRuntime implements SimulationRuntime {
     match.wins1 = input.wins1;
     match.wins2 = input.wins2;
     match.draws = input.draws;
-    if (input.wins1 > input.wins2) match.result = "P1_WIN";
-    else if (input.wins2 > input.wins1) match.result = "P2_WIN";
-    else match.result = "DRAW";
+    if (input.wins1 > input.wins2) match.result = 'P1_WIN';
+    else if (input.wins2 > input.wins1) match.result = 'P2_WIN';
+    else match.result = 'DRAW';
   }
 
   async finishTournament(tournamentId: string) {
@@ -267,18 +274,20 @@ class FakeSimulationRuntime implements SimulationRuntime {
           player1Id: match.player1RegistrationId,
           player2Id: match.player2RegistrationId,
           result: match.result,
-        }))
-      )
+        })),
+      ),
     );
 
     for (const registration of tournament.registrations) {
       const finalRating = replayed.get(registration.id) ?? registration.startingElo;
       registration.currentElo = finalRating;
-      const player = [...this.players.values()].find((candidate) => candidate.id === registration.playerId);
+      const player = [...this.players.values()].find(
+        (candidate) => candidate.id === registration.playerId,
+      );
       if (player) player.rating = finalRating;
     }
 
-    tournament.status = "FINISHED";
+    tournament.status = 'FINISHED';
   }
 
   async getStandings(tournamentId: string) {
@@ -290,17 +299,32 @@ class FakeSimulationRuntime implements SimulationRuntime {
 
     for (const round of tournament.rounds) {
       for (const match of round.matches) {
-        if (match.result === "BYE") {
-          points.set(match.player1RegistrationId, (points.get(match.player1RegistrationId) ?? 0) + 3);
+        if (match.result === 'BYE') {
+          points.set(
+            match.player1RegistrationId,
+            (points.get(match.player1RegistrationId) ?? 0) + 3,
+          );
           continue;
         }
-        if (match.result === "P1_WIN") {
-          points.set(match.player1RegistrationId, (points.get(match.player1RegistrationId) ?? 0) + 3);
-        } else if (match.result === "P2_WIN" && match.player2RegistrationId) {
-          points.set(match.player2RegistrationId, (points.get(match.player2RegistrationId) ?? 0) + 3);
-        } else if (match.result === "DRAW" && match.player2RegistrationId) {
-          points.set(match.player1RegistrationId, (points.get(match.player1RegistrationId) ?? 0) + 1);
-          points.set(match.player2RegistrationId, (points.get(match.player2RegistrationId) ?? 0) + 1);
+        if (match.result === 'P1_WIN') {
+          points.set(
+            match.player1RegistrationId,
+            (points.get(match.player1RegistrationId) ?? 0) + 3,
+          );
+        } else if (match.result === 'P2_WIN' && match.player2RegistrationId) {
+          points.set(
+            match.player2RegistrationId,
+            (points.get(match.player2RegistrationId) ?? 0) + 3,
+          );
+        } else if (match.result === 'DRAW' && match.player2RegistrationId) {
+          points.set(
+            match.player1RegistrationId,
+            (points.get(match.player1RegistrationId) ?? 0) + 1,
+          );
+          points.set(
+            match.player2RegistrationId,
+            (points.get(match.player2RegistrationId) ?? 0) + 1,
+          );
         }
       }
     }
@@ -323,7 +347,7 @@ class FakeSimulationRuntime implements SimulationRuntime {
 
   async validatePoolRatings(playerIds: string[]): Promise<RatingValidationResult> {
     const histories: PersistedTournamentHistory[] = this.tournaments
-      .filter((tournament) => tournament.status === "FINISHED")
+      .filter((tournament) => tournament.status === 'FINISHED')
       .map((tournament) => ({
         tournamentId: tournament.id,
         tournamentName: tournament.name,
@@ -342,7 +366,7 @@ class FakeSimulationRuntime implements SimulationRuntime {
             player1Id: match.player1RegistrationId,
             player2Id: match.player2RegistrationId,
             result: match.result,
-          }))
+          })),
         ),
       }));
 
@@ -364,7 +388,9 @@ class FakeSimulationRuntime implements SimulationRuntime {
   }
 
   private getRegistration(tournament: FakeTournament, registrationId: string) {
-    const registration = tournament.registrations.find((candidate) => candidate.id === registrationId);
+    const registration = tournament.registrations.find(
+      (candidate) => candidate.id === registrationId,
+    );
     if (!registration) throw new Error(`Unknown registration ${registrationId}`);
     return registration;
   }
@@ -380,16 +406,20 @@ class FakeSimulationRuntime implements SimulationRuntime {
   }
 }
 
-describe("seeded simulation helpers", () => {
-  it("selects Draft/Cube participants deterministically within the 6-12 pod range", () => {
-    const rngA = createSeededRandom("alpha-seed");
-    const rngB = createSeededRandom("alpha-seed");
+describe('seeded simulation helpers', () => {
+  it('selects Draft/Cube participants deterministically within the 6-12 pod range', () => {
+    const rngA = createSeededRandom('alpha-seed');
+    const rngB = createSeededRandom('alpha-seed');
 
     const selectionsA = Array.from({ length: 5 }, () =>
-      pickTournamentParticipants(SIMULATION_PLAYER_POOL, rngA, "Draft").map((player) => player.dciNumber)
+      pickTournamentParticipants(SIMULATION_PLAYER_POOL, rngA, 'Draft').map(
+        (player) => player.dciNumber,
+      ),
     );
     const selectionsB = Array.from({ length: 5 }, () =>
-      pickTournamentParticipants(SIMULATION_PLAYER_POOL, rngB, "Draft").map((player) => player.dciNumber)
+      pickTournamentParticipants(SIMULATION_PLAYER_POOL, rngB, 'Draft').map(
+        (player) => player.dciNumber,
+      ),
     );
 
     expect(selectionsA).toEqual(selectionsB);
@@ -400,53 +430,53 @@ describe("seeded simulation helpers", () => {
     }
   });
 
-  it("can fill non-pod formats up to full room capacity", () => {
-    const rng = createSeededRandom("full-room-seed");
-    const randomField = pickTournamentParticipants(SIMULATION_PLAYER_POOL, rng, "Modern");
-    const fullRoom = pickTournamentParticipants(SIMULATION_PLAYER_POOL, rng, "Modern", true);
+  it('can fill non-pod formats up to full room capacity', () => {
+    const rng = createSeededRandom('full-room-seed');
+    const randomField = pickTournamentParticipants(SIMULATION_PLAYER_POOL, rng, 'Modern');
+    const fullRoom = pickTournamentParticipants(SIMULATION_PLAYER_POOL, rng, 'Modern', true);
 
     expect(randomField.length).toBeGreaterThanOrEqual(6);
     expect(randomField.length).toBeLessThanOrEqual(MAX_TOURNAMENT_PLAYERS);
     expect(fullRoom).toHaveLength(MAX_TOURNAMENT_PLAYERS);
   });
 
-  it("generates only legal random results for each format", () => {
-    const rng = createSeededRandom("results-seed");
-    const formats: BestOfFormat[] = ["BO1", "BO3", "BO5"];
+  it('generates only legal random results for each format', () => {
+    const rng = createSeededRandom('results-seed');
+    const formats: BestOfFormat[] = ['BO1', 'BO3', 'BO5'];
 
     for (const format of formats) {
       for (let index = 0; index < 100; index += 1) {
         const result = generateRandomResult(format, rng);
         expect(isValidRandomResult(format, result)).toBe(true);
-        expect(typeof describeResult(result)).toBe("string");
+        expect(typeof describeResult(result)).toBe('string');
       }
     }
   });
 
-  it("selects best-of formats deterministically from the seeded rng", () => {
-    const rngA = createSeededRandom("format-seed");
-    const rngB = createSeededRandom("format-seed");
+  it('selects best-of formats deterministically from the seeded rng', () => {
+    const rngA = createSeededRandom('format-seed');
+    const rngB = createSeededRandom('format-seed');
     const sequenceA = Array.from({ length: 12 }, () => pickBestOfFormat(rngA));
     const sequenceB = Array.from({ length: 12 }, () => pickBestOfFormat(rngB));
     expect(sequenceA).toEqual(sequenceB);
   });
 
-  it("selects tournament formats deterministically from the seeded rng", () => {
-    const rngA = createSeededRandom("tournament-format-seed");
-    const rngB = createSeededRandom("tournament-format-seed");
+  it('selects tournament formats deterministically from the seeded rng', () => {
+    const rngA = createSeededRandom('tournament-format-seed');
+    const rngB = createSeededRandom('tournament-format-seed');
     const sequenceA = Array.from({ length: 16 }, () => pickTournamentFormat(rngA));
     const sequenceB = Array.from({ length: 16 }, () => pickTournamentFormat(rngB));
     const validFormats: TournamentFormat[] = [
-      "Draft",
-      "Sealed",
-      "Cube",
-      "Standard",
-      "Pioneer",
-      "Modern",
-      "Legacy",
-      "Vintage",
-      "Pauper",
-      "Commander",
+      'Draft',
+      'Sealed',
+      'Cube',
+      'Standard',
+      'Pioneer',
+      'Modern',
+      'Legacy',
+      'Vintage',
+      'Pauper',
+      'Commander',
     ];
 
     expect(sequenceA).toEqual(sequenceB);
@@ -455,26 +485,38 @@ describe("seeded simulation helpers", () => {
   });
 });
 
-describe("validatePersistedTournamentRatings", () => {
-  it("accepts a matching replay and persisted player ratings", () => {
+describe('validatePersistedTournamentRatings', () => {
+  it('accepts a matching replay and persisted player ratings', () => {
     const tournaments: PersistedTournamentHistory[] = [
       {
-        tournamentId: "t1",
-        tournamentName: "T1",
-        createdAt: "2026-01-01T00:00:00.000Z",
+        tournamentId: 't1',
+        tournamentName: 'T1',
+        createdAt: '2026-01-01T00:00:00.000Z',
         registrations: [
-          { tournamentPlayerId: "tp1", playerId: "p1", playerName: "Alice", startingElo: 1500, currentElo: 1516 },
-          { tournamentPlayerId: "tp2", playerId: "p2", playerName: "Bob", startingElo: 1500, currentElo: 1484 },
+          {
+            tournamentPlayerId: 'tp1',
+            playerId: 'p1',
+            playerName: 'Alice',
+            startingElo: 1500,
+            currentElo: 1516,
+          },
+          {
+            tournamentPlayerId: 'tp2',
+            playerId: 'p2',
+            playerName: 'Bob',
+            startingElo: 1500,
+            currentElo: 1484,
+          },
         ],
         matches: [
-          { roundNumber: 1, tableNumber: 1, player1Id: "tp1", player2Id: "tp2", result: "P1_WIN" },
+          { roundNumber: 1, tableNumber: 1, player1Id: 'tp1', player2Id: 'tp2', result: 'P1_WIN' },
         ],
       },
     ];
 
     const actualPlayers: ActualPlayerRating[] = [
-      { playerId: "p1", name: "Alice", rating: 1516 },
-      { playerId: "p2", name: "Bob", rating: 1484 },
+      { playerId: 'p1', name: 'Alice', rating: 1516 },
+      { playerId: 'p2', name: 'Bob', rating: 1484 },
     ];
 
     const validation = validatePersistedTournamentRatings(tournaments, actualPlayers);
@@ -484,60 +526,102 @@ describe("validatePersistedTournamentRatings", () => {
     expect(validation.startingEloMismatches).toHaveLength(0);
   });
 
-  it("reports mismatches when persisted ratings diverge from the replay", () => {
+  it('reports mismatches when persisted ratings diverge from the replay', () => {
     const tournaments: PersistedTournamentHistory[] = [
       {
-        tournamentId: "t1",
-        tournamentName: "T1",
-        createdAt: "2026-01-01T00:00:00.000Z",
+        tournamentId: 't1',
+        tournamentName: 'T1',
+        createdAt: '2026-01-01T00:00:00.000Z',
         registrations: [
-          { tournamentPlayerId: "tp1", playerId: "p1", playerName: "Alice", startingElo: 1500, currentElo: 1516 },
-          { tournamentPlayerId: "tp2", playerId: "p2", playerName: "Bob", startingElo: 1500, currentElo: 1484 },
+          {
+            tournamentPlayerId: 'tp1',
+            playerId: 'p1',
+            playerName: 'Alice',
+            startingElo: 1500,
+            currentElo: 1516,
+          },
+          {
+            tournamentPlayerId: 'tp2',
+            playerId: 'p2',
+            playerName: 'Bob',
+            startingElo: 1500,
+            currentElo: 1484,
+          },
         ],
         matches: [
-          { roundNumber: 1, tableNumber: 1, player1Id: "tp1", player2Id: "tp2", result: "P1_WIN" },
+          { roundNumber: 1, tableNumber: 1, player1Id: 'tp1', player2Id: 'tp2', result: 'P1_WIN' },
         ],
       },
       {
-        tournamentId: "t2",
-        tournamentName: "T2",
-        createdAt: "2026-01-02T00:00:00.000Z",
+        tournamentId: 't2',
+        tournamentName: 'T2',
+        createdAt: '2026-01-02T00:00:00.000Z',
         registrations: [
-          { tournamentPlayerId: "tp3", playerId: "p1", playerName: "Alice", startingElo: 1500, currentElo: 1500 },
-          { tournamentPlayerId: "tp4", playerId: "p2", playerName: "Bob", startingElo: 1484, currentElo: 1484 },
+          {
+            tournamentPlayerId: 'tp3',
+            playerId: 'p1',
+            playerName: 'Alice',
+            startingElo: 1500,
+            currentElo: 1500,
+          },
+          {
+            tournamentPlayerId: 'tp4',
+            playerId: 'p2',
+            playerName: 'Bob',
+            startingElo: 1484,
+            currentElo: 1484,
+          },
         ],
         matches: [
-          { roundNumber: 1, tableNumber: 1, player1Id: "tp3", player2Id: "tp4", result: "DRAW" },
+          { roundNumber: 1, tableNumber: 1, player1Id: 'tp3', player2Id: 'tp4', result: 'DRAW' },
         ],
       },
     ];
 
     const actualPlayers: ActualPlayerRating[] = [
-      { playerId: "p1", name: "Alice", rating: 1510 },
-      { playerId: "p2", name: "Bob", rating: 1484 },
+      { playerId: 'p1', name: 'Alice', rating: 1510 },
+      { playerId: 'p2', name: 'Bob', rating: 1484 },
     ];
 
     const validation = validatePersistedTournamentRatings(tournaments, actualPlayers);
     expect(validation.ok).toBe(false);
     expect(validation.playerRatingMismatches.length).toBeGreaterThan(0);
     expect(validation.startingEloMismatches.length).toBeGreaterThan(0);
-    expect(buildValidationFailureMessage(validation)).toContain("mismatch");
+    expect(buildValidationFailureMessage(validation)).toContain('mismatch');
   });
 });
 
-describe("runSeededTournamentSimulation", () => {
-  it("runs ten tournaments against a persistent pool and finishes with valid replayed ratings", async () => {
+describe('runSeededTournamentSimulation', () => {
+  it('runs ten tournaments against a persistent pool and finishes with valid replayed ratings', async () => {
     const runtime = new FakeSimulationRuntime();
 
     const summary = await runSeededTournamentSimulation({
-      seed: "integration-seed",
+      seed: 'integration-seed',
       runtime,
     });
 
     expect(summary.tournaments).toHaveLength(10);
-    expect(summary.tournaments.some((tournament) => tournament.format === "Draft" || tournament.format === "Cube")).toBe(true);
-    expect(summary.tournaments.some((tournament) => tournament.format === "Modern" || tournament.format === "Standard" || tournament.format === "Commander")).toBe(true);
-    expect(summary.tournaments.some((tournament) => tournament.participants.length === MAX_TOURNAMENT_PLAYERS && tournament.format !== "Draft" && tournament.format !== "Cube")).toBe(true);
+    expect(
+      summary.tournaments.some(
+        (tournament) => tournament.format === 'Draft' || tournament.format === 'Cube',
+      ),
+    ).toBe(true);
+    expect(
+      summary.tournaments.some(
+        (tournament) =>
+          tournament.format === 'Modern' ||
+          tournament.format === 'Standard' ||
+          tournament.format === 'Commander',
+      ),
+    ).toBe(true);
+    expect(
+      summary.tournaments.some(
+        (tournament) =>
+          tournament.participants.length === MAX_TOURNAMENT_PLAYERS &&
+          tournament.format !== 'Draft' &&
+          tournament.format !== 'Cube',
+      ),
+    ).toBe(true);
     expect(summary.finalValidation.ok).toBe(true);
     expect(summary.finalRatings).toHaveLength(SIMULATION_PLAYER_POOL.length);
     expect(summary.finalRatings.some((player) => player.rating !== 1500)).toBe(true);

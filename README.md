@@ -7,13 +7,13 @@ Real-time pairings and standings via WebSockets.
 
 ## Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | Node.js + Express + TypeScript |
-| Frontend | React + Vite + TailwindCSS |
-| Database | PostgreSQL + Prisma ORM |
-| Realtime | Socket.io |
-| Deploy | Docker + nginx |
+| Layer    | Technology                     |
+| -------- | ------------------------------ |
+| Backend  | Node.js + Express + TypeScript |
+| Frontend | React + Vite + TailwindCSS     |
+| Database | PostgreSQL + Prisma ORM        |
+| Realtime | Socket.io                      |
+| Deploy   | Docker + nginx                 |
 
 ---
 
@@ -37,6 +37,7 @@ docker compose -f docker/docker-compose.dev.yml up
 ```
 
 This runs:
+
 - Postgres in Docker
 - Backend with `tsx watch` on **http://localhost:3001**
 - Frontend with Vite HMR on **http://localhost:5173**
@@ -48,6 +49,7 @@ Changes in `backend/`, `frontend/`, and `database/schema.prisma` are reflected w
 The dev Compose stack exposes PostgreSQL on **localhost:5433** so you can inspect it from tools like DBCode.
 
 Use this connection:
+
 - Host: `localhost`
 - Port: `5433`
 - Database: `mtg_tournament`
@@ -111,6 +113,7 @@ npm test
 ```
 
 Tests cover:
+
 - Correct pairing count (even/odd players)
 - BYE assigned only once per player
 - Rematch avoidance
@@ -139,20 +142,20 @@ Performance: < 100ms typical for 256 players.
 
 ## API Reference
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/tournaments` | List all tournaments |
-| `POST` | `/api/tournaments` | Create tournament |
-| `GET` | `/api/tournaments/:id` | Get tournament detail |
-| `POST` | `/api/tournaments/:id/start` | Start tournament |
-| `POST` | `/api/tournaments/:id/finish` | Finalize tournament |
-| `POST` | `/api/tournaments/:id/players` | Add player |
-| `DELETE` | `/api/players/:id` | Drop player |
-| `POST` | `/api/tournaments/:id/rounds` | Generate next round |
-| `PATCH` | `/api/matches/:id/result` | Report match result |
-| `GET` | `/api/tournaments/:id/standings` | Get standings |
-| `GET` | `/api/tournaments/:id/top8` | Get Top 8 bracket |
-| `GET` | `/api/tournaments/:id/export` | Export results as CSV |
+| Method   | Path                             | Description           |
+| -------- | -------------------------------- | --------------------- |
+| `GET`    | `/api/tournaments`               | List all tournaments  |
+| `POST`   | `/api/tournaments`               | Create tournament     |
+| `GET`    | `/api/tournaments/:id`           | Get tournament detail |
+| `POST`   | `/api/tournaments/:id/start`     | Start tournament      |
+| `POST`   | `/api/tournaments/:id/finish`    | Finalize tournament   |
+| `POST`   | `/api/tournaments/:id/players`   | Add player            |
+| `DELETE` | `/api/players/:id`               | Drop player           |
+| `POST`   | `/api/tournaments/:id/rounds`    | Generate next round   |
+| `PATCH`  | `/api/matches/:id/result`        | Report match result   |
+| `GET`    | `/api/tournaments/:id/standings` | Get standings         |
+| `GET`    | `/api/tournaments/:id/top8`      | Get Top 8 bracket     |
+| `GET`    | `/api/tournaments/:id/export`    | Export results as CSV |
 
 ---
 
@@ -160,13 +163,13 @@ Performance: < 100ms typical for 256 players.
 
 Join a tournament room: emit `join_tournament` with `tournamentId`.
 
-| Event | Direction | Payload |
-|-------|-----------|---------|
-| `join_tournament` | client → server | `tournamentId` |
-| `pairings_updated` | server → client | round data |
-| `standings_updated` | server → client | standings array |
-| `result_reported` | server → client | match data |
-| `round_started` | server → client | round info |
+| Event                 | Direction       | Payload         |
+| --------------------- | --------------- | --------------- |
+| `join_tournament`     | client → server | `tournamentId`  |
+| `pairings_updated`    | server → client | round data      |
+| `standings_updated`   | server → client | standings array |
+| `result_reported`     | server → client | match data      |
+| `round_started`       | server → client | round info      |
 | `tournament_finished` | server → client | tournament info |
 
 ---

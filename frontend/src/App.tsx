@@ -1,9 +1,9 @@
-import { Routes, Route } from "react-router-dom";
-import { Home } from "./pages/Home";
-import { Tournament } from "./pages/Tournament";
-import { Pairings } from "./pages/Pairings";
-import { Standings } from "./pages/Standings";
-import { PlayerHistory } from "./pages/PlayerHistory";
+import { Routes, Route } from 'react-router-dom';
+import { Home } from './pages/Home';
+import { Tournament } from './pages/Tournament';
+import { Pairings } from './pages/Pairings';
+import { Standings } from './pages/Standings';
+import { PlayerHistory } from './pages/PlayerHistory';
 
 export default function App() {
   return (

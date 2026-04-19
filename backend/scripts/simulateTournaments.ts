@@ -1,12 +1,15 @@
-import { createRealSimulationRuntime, runSeededTournamentSimulation } from "../src/simulationService";
+import {
+  createRealSimulationRuntime,
+  runSeededTournamentSimulation,
+} from '../src/simulationService';
 
 function parseSeed(argv: string[]) {
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index]!;
-    if (value === "--seed") return argv[index + 1] ?? "mtg-sim";
-    if (value.startsWith("--seed=")) return value.slice("--seed=".length) || "mtg-sim";
+    if (value === '--seed') return argv[index + 1] ?? 'mtg-sim';
+    if (value.startsWith('--seed=')) return value.slice('--seed='.length) || 'mtg-sim';
   }
-  return "mtg-sim";
+  return 'mtg-sim';
 }
 
 async function main() {
@@ -25,6 +28,6 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    const { prisma } = await import("../src/db");
+    const { prisma } = await import('../src/db');
     await prisma.$disconnect();
   });

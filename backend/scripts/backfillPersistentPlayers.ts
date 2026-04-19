@@ -1,9 +1,9 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 function normalizeName(name: string) {
-  return name.trim().replace(/\s+/g, " ").toLowerCase();
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 function normalizeDciNumber(dciNumber: string | null) {
@@ -14,17 +14,14 @@ function normalizeDciNumber(dciNumber: string | null) {
 async function main() {
   const registrations = await prisma.tournamentPlayer.findMany({
     where: { playerId: null },
-    orderBy: [{ tournamentId: "asc" }, { id: "asc" }],
+    orderBy: [{ tournamentId: 'asc' }, { id: 'asc' }],
   });
 
   for (const registration of registrations) {
     const normalizedName = normalizeName(registration.displayName);
     const dciNumber = normalizeDciNumber(registration.displayDciNumber);
 
-    let player =
-      dciNumber
-        ? await prisma.player.findUnique({ where: { dciNumber } })
-        : null;
+    let player = dciNumber ? await prisma.player.findUnique({ where: { dciNumber } }) : null;
 
     if (!player) {
       const matchedByName = await prisma.player.findMany({

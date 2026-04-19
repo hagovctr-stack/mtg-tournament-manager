@@ -1,33 +1,33 @@
-import { useState, useEffect, useCallback } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { api, type TournamentDetail, type RoundDetail } from "../api";
-import { PlayerList } from "../components/PlayerList";
-import { PairingsTable } from "../components/PairingsTable";
-import { StandingsTable } from "../components/StandingsTable";
-import { Timer } from "../components/Timer";
-import { DraftPod } from "../components/DraftPod";
-import { joinTournament, getSocket } from "../socket";
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { api, type TournamentDetail, type RoundDetail } from '../api';
+import { PlayerList } from '../components/PlayerList';
+import { PairingsTable } from '../components/PairingsTable';
+import { StandingsTable } from '../components/StandingsTable';
+import { Timer } from '../components/Timer';
+import { DraftPod } from '../components/DraftPod';
+import { joinTournament, getSocket } from '../socket';
 
-type Tab = "players" | "pairings" | "standings";
+type Tab = 'players' | 'pairings' | 'standings';
 
 export function Tournament() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [tournament, setTournament] = useState<TournamentDetail | null>(null);
-  const [tab, setTab] = useState<Tab>("players");
+  const [tab, setTab] = useState<Tab>('players');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [isRandomizingSeats, setIsRandomizingSeats] = useState(false);
 
   // Edit tournament state
   const [showEdit, setShowEdit] = useState(false);
-  const [editName, setEditName] = useState("");
-  const [editFormat, setEditFormat] = useState("");
-  const [editSubtitle, setEditSubtitle] = useState("");
-  const [editCubeCobraUrl, setEditCubeCobraUrl] = useState("");
+  const [editName, setEditName] = useState('');
+  const [editFormat, setEditFormat] = useState('');
+  const [editSubtitle, setEditSubtitle] = useState('');
+  const [editCubeCobraUrl, setEditCubeCobraUrl] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -36,16 +36,18 @@ export function Tournament() {
       const t = await api.getTournament(id);
       setTournament(t);
     } catch {
-      setError("Failed to load tournament");
+      setError('Failed to load tournament');
     }
   }, [id]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   useEffect(() => {
     document.title = tournament
       ? `${tournament.name} | MTG Tournament Manager`
-      : "Tournament | MTG Tournament Manager";
+      : 'Tournament | MTG Tournament Manager';
   }, [tournament]);
 
   useEffect(() => {
@@ -53,27 +55,29 @@ export function Tournament() {
     joinTournament(id);
     const socket = getSocket();
     const onUpdate = () => refresh();
-    socket.on("pairings_updated", onUpdate);
-    socket.on("standings_updated", onUpdate);
-    socket.on("result_reported", onUpdate);
-    socket.on("round_started", onUpdate);
+    socket.on('pairings_updated', onUpdate);
+    socket.on('standings_updated', onUpdate);
+    socket.on('result_reported', onUpdate);
+    socket.on('round_started', onUpdate);
     return () => {
-      socket.off("pairings_updated", onUpdate);
-      socket.off("standings_updated", onUpdate);
-      socket.off("result_reported", onUpdate);
-      socket.off("round_started", onUpdate);
+      socket.off('pairings_updated', onUpdate);
+      socket.off('standings_updated', onUpdate);
+      socket.off('result_reported', onUpdate);
+      socket.off('round_started', onUpdate);
     };
   }, [id, refresh]);
 
   const handleStart = async () => {
-    if (!id || !confirm("Start the tournament?")) return;
+    if (!id || !confirm('Start the tournament?')) return;
     setLoading(true);
     try {
       await api.startTournament(id);
       await refresh();
-      setTab(tournament?.format === "Cube" || tournament?.format === "Draft" ? "players" : "pairings");
+      setTab(
+        tournament?.format === 'Cube' || tournament?.format === 'Draft' ? 'players' : 'pairings',
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error");
+      setError(err instanceof Error ? err.message : 'Error');
     } finally {
       setLoading(false);
     }
@@ -82,26 +86,26 @@ export function Tournament() {
   const handleGenerateRound = async () => {
     if (!id) return;
     setLoading(true);
-    setError("");
+    setError('');
     try {
       await api.generateRound(id);
       await refresh();
-      setTab("pairings");
+      setTab('pairings');
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error generating round");
+      setError(err instanceof Error ? err.message : 'Error generating round');
     } finally {
       setLoading(false);
     }
   };
 
   const handleFinish = async () => {
-    if (!id || !confirm("End the tournament and finalize standings?")) return;
+    if (!id || !confirm('End the tournament and finalize standings?')) return;
     try {
       await api.finishTournament(id);
       await refresh();
-      setTab("standings");
+      setTab('standings');
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Error");
+      alert(err instanceof Error ? err.message : 'Error');
     }
   };
 
@@ -110,12 +114,12 @@ export function Tournament() {
     if (deleteConfirmation !== tournament.name) return;
 
     setDeleteLoading(true);
-    setError("");
+    setError('');
     try {
       await api.deleteTournament(id);
-      navigate("/");
+      navigate('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error deleting tournament");
+      setError(err instanceof Error ? err.message : 'Error deleting tournament');
       setDeleteLoading(false);
     }
   };
@@ -123,12 +127,12 @@ export function Tournament() {
   const handleRandomizeSeats = async () => {
     if (!id) return;
     setIsRandomizingSeats(true);
-    setError("");
+    setError('');
     try {
       await api.randomizeSeats(id);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error randomizing seats");
+      setError(err instanceof Error ? err.message : 'Error randomizing seats');
     } finally {
       setIsRandomizingSeats(false);
     }
@@ -139,7 +143,7 @@ export function Tournament() {
     setEditName(tournament.name);
     setEditFormat(tournament.format);
     setEditSubtitle(tournament.subtitle);
-    setEditCubeCobraUrl(tournament.cubeCobraUrl ?? "");
+    setEditCubeCobraUrl(tournament.cubeCobraUrl ?? '');
     setShowEdit(true);
   };
 
@@ -147,7 +151,7 @@ export function Tournament() {
     e.preventDefault();
     if (!id) return;
     setEditSubmitting(true);
-    setError("");
+    setError('');
     try {
       await api.updateTournament(id, {
         name: editName.trim() || undefined,
@@ -158,7 +162,7 @@ export function Tournament() {
       await refresh();
       setShowEdit(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error updating tournament");
+      setError(err instanceof Error ? err.message : 'Error updating tournament');
     } finally {
       setEditSubmitting(false);
     }
@@ -168,37 +172,36 @@ export function Tournament() {
     return <div className="text-center py-16 text-gray-400">Loading...</div>;
   }
 
-  const currentRound = tournament.rounds.find(
-    (r) => r.number === tournament.currentRound
-  ) as RoundDetail | undefined;
+  const currentRound = tournament.rounds.find((r) => r.number === tournament.currentRound) as
+    | RoundDetail
+    | undefined;
 
-  const isSeatBasedTournament = tournament.format === "Cube" || tournament.format === "Draft";
+  const isSeatBasedTournament = tournament.format === 'Cube' || tournament.format === 'Draft';
   const activePlayers = tournament.players.filter((player) => player.active);
   const allActivePlayersSeated =
     activePlayers.length > 0 && activePlayers.every((player) => player.seatNumber != null);
   const hasSeatAssignments = activePlayers.some((player) => player.seatNumber != null);
   const canRandomizeSeats =
     isSeatBasedTournament &&
-    tournament.status === "ACTIVE" &&
+    tournament.status === 'ACTIVE' &&
     tournament.currentRound === 0 &&
     tournament.rounds.length === 0;
   const showDraftPod =
     isSeatBasedTournament &&
-    (tournament.status === "REGISTRATION" || canRandomizeSeats || hasSeatAssignments);
+    (tournament.status === 'REGISTRATION' || canRandomizeSeats || hasSeatAssignments);
 
-  const allResultsIn =
-    currentRound?.matches.every((m) => m.result !== "PENDING") ?? false;
+  const allResultsIn = currentRound?.matches.every((m) => m.result !== 'PENDING') ?? false;
 
   const canGenerateRound =
-    tournament.status === "ACTIVE" &&
+    tournament.status === 'ACTIVE' &&
     (tournament.currentRound === 0 || allResultsIn) &&
     tournament.currentRound < tournament.totalRounds &&
     (!isSeatBasedTournament || tournament.currentRound > 0 || allActivePlayersSeated);
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: "players", label: "Players" },
-    { key: "pairings", label: "Pairings" },
-    { key: "standings", label: "Standings" },
+    { key: 'players', label: 'Players' },
+    { key: 'pairings', label: 'Pairings' },
+    { key: 'standings', label: 'Standings' },
   ];
 
   return (
@@ -206,11 +209,14 @@ export function Tournament() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <Link to="/" className="text-blue-500 text-sm hover:underline">← Back</Link>
+          <Link to="/" className="text-blue-500 text-sm hover:underline">
+            ← Back
+          </Link>
           <h1 className="text-2xl font-bold text-gray-900 mt-1">{tournament.name}</h1>
           <p className="text-sm text-gray-500">
-            {tournament.format}{tournament.subtitle ? ` · ${tournament.subtitle}` : ""} · {tournament.players.length} players ·{" "}
-            Round {tournament.currentRound}/{tournament.totalRounds || "?"}
+            {tournament.format}
+            {tournament.subtitle ? ` · ${tournament.subtitle}` : ''} · {tournament.players.length}{' '}
+            players · Round {tournament.currentRound}/{tournament.totalRounds || '?'}
           </p>
           {tournament.cubeCobraUrl && (
             <a
@@ -225,7 +231,7 @@ export function Tournament() {
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          {tournament.status === "REGISTRATION" && (
+          {tournament.status === 'REGISTRATION' && (
             <button
               onClick={handleStart}
               disabled={loading}
@@ -241,13 +247,13 @@ export function Tournament() {
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold text-sm disabled:opacity-50"
             >
               {loading
-                ? "Generating..."
+                ? 'Generating...'
                 : isSeatBasedTournament && tournament.currentRound === 0
-                  ? "Pair Round 1"
+                  ? 'Pair Round 1'
                   : `Pair Round ${tournament.currentRound + 1}`}
             </button>
           )}
-          {tournament.status === "ACTIVE" &&
+          {tournament.status === 'ACTIVE' &&
             tournament.currentRound >= tournament.totalRounds &&
             allResultsIn && (
               <button
@@ -272,7 +278,7 @@ export function Tournament() {
           <button
             onClick={() => {
               setShowDeleteConfirm((current) => !current);
-              setDeleteConfirmation("");
+              setDeleteConfirmation('');
             }}
             className="bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 rounded font-semibold text-sm"
           >
@@ -332,17 +338,19 @@ export function Tournament() {
                 />
               </div>
             </div>
-            {editFormat === "Cube" && (
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Cube Cobra URL (optional)</label>
-              <input
-                type="url"
-                placeholder="https://cubecobra.com/cube/list/…"
-                value={editCubeCobraUrl}
-                onChange={(e) => setEditCubeCobraUrl(e.target.value)}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            {editFormat === 'Cube' && (
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">
+                  Cube Cobra URL (optional)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://cubecobra.com/cube/list/…"
+                  value={editCubeCobraUrl}
+                  onChange={(e) => setEditCubeCobraUrl(e.target.value)}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             )}
             <div className="flex gap-2">
               <button
@@ -350,7 +358,7 @@ export function Tournament() {
                 disabled={editSubmitting}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-semibold disabled:opacity-50"
               >
-                {editSubmitting ? "Saving…" : "Save Changes"}
+                {editSubmitting ? 'Saving…' : 'Save Changes'}
               </button>
               <button
                 type="button"
@@ -368,8 +376,8 @@ export function Tournament() {
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
           <p className="text-sm font-semibold text-red-800">Delete tournament</p>
           <p className="mt-1 text-sm text-red-700">
-            This will permanently remove <span className="font-semibold">{tournament.name}</span> and
-            all of its players, rounds, matches, and standings.
+            This will permanently remove <span className="font-semibold">{tournament.name}</span>{' '}
+            and all of its players, rounds, matches, and standings.
           </p>
           <p className="mt-3 text-sm text-red-700">
             Type <span className="font-mono font-semibold">{tournament.name}</span> to confirm.
@@ -388,12 +396,12 @@ export function Tournament() {
                 disabled={deleteLoading || deleteConfirmation !== tournament.name}
                 className="rounded bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {deleteLoading ? "Deleting..." : "Permanently Delete"}
+                {deleteLoading ? 'Deleting...' : 'Permanently Delete'}
               </button>
               <button
                 onClick={() => {
                   setShowDeleteConfirm(false);
-                  setDeleteConfirmation("");
+                  setDeleteConfirmation('');
                 }}
                 className="rounded bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
               >
@@ -405,7 +413,7 @@ export function Tournament() {
       )}
 
       {/* Round timer */}
-      {tournament.status === "ACTIVE" && currentRound?.status === "ACTIVE" && (
+      {tournament.status === 'ACTIVE' && currentRound?.status === 'ACTIVE' && (
         <div className="mb-6 p-4 bg-white border border-gray-200 rounded-lg text-center">
           <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
             Round {currentRound.number} Timer
@@ -422,8 +430,8 @@ export function Tournament() {
             onClick={() => setTab(t.key)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
               tab === t.key
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-600 hover:text-gray-800"
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-800'
             }`}
           >
             {t.label}
@@ -432,7 +440,7 @@ export function Tournament() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-4">
-        {tab === "players" && (
+        {tab === 'players' && (
           <>
             {showDraftPod && (
               <DraftPod
@@ -446,13 +454,13 @@ export function Tournament() {
             <PlayerList
               tournamentId={tournament.id}
               players={tournament.players}
-              canEdit={tournament.status === "REGISTRATION"}
+              canEdit={tournament.status === 'REGISTRATION'}
               onUpdate={refresh}
             />
           </>
         )}
 
-        {tab === "pairings" && (
+        {tab === 'pairings' && (
           <div className="space-y-6">
             {tournament.rounds.length === 0 && (
               <p className="text-gray-400 text-sm text-center py-8">No rounds generated yet.</p>
@@ -462,12 +470,12 @@ export function Tournament() {
               .map((round) => (
                 <div key={round.id}>
                   <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                    Round {round.number}{" "}
+                    Round {round.number}{' '}
                     <span
                       className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
-                        round.status === "ACTIVE"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-600"
+                        round.status === 'ACTIVE'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-600'
                       }`}
                     >
                       {round.status}
@@ -475,7 +483,10 @@ export function Tournament() {
                   </h3>
                   <PairingsTable
                     matches={(round as RoundDetail).matches}
-                    canReport={tournament.status === "ACTIVE" && (round.status === "ACTIVE" || round.status === "FINISHED")}
+                    canReport={
+                      tournament.status === 'ACTIVE' &&
+                      (round.status === 'ACTIVE' || round.status === 'FINISHED')
+                    }
                     bestOfFormat={tournament.bestOfFormat}
                     onUpdate={refresh}
                   />
@@ -484,15 +495,15 @@ export function Tournament() {
           </div>
         )}
 
-        {tab === "standings" && (
+        {tab === 'standings' && (
           <StandingsTable
             tournamentId={tournament.id}
             standings={tournament.standings}
             finishedRounds={tournament.rounds
-              .filter((r) => r.status === "FINISHED")
+              .filter((r) => r.status === 'FINISHED')
               .map((r) => r.number)
               .sort((a, b) => a - b)}
-            finished={tournament.status === "FINISHED"}
+            finished={tournament.status === 'FINISHED'}
           />
         )}
       </div>

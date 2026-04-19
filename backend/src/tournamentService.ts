@@ -1,21 +1,21 @@
-import { prisma } from "./db";
+import { prisma } from './db';
 import {
   generatePairings,
   generateSeatPairings,
   recommendedRounds,
   type PlayerState,
-} from "./pairingAlgorithm";
+} from './pairingAlgorithm';
 import {
   ensureTournamentHasCapacity,
   usesDraftPodSeating,
   validateTournamentPlayerCount,
-} from "./tournamentRules";
-import { recalculateTournamentElo, syncTournamentEloToPlayerRatings } from "./eloService";
-import { recalculateStandings } from "./standingsService";
-import { serializeEventPlayer, serializeMatch, serializeRound } from "./presenters";
+} from './tournamentRules';
+import { recalculateTournamentElo, syncTournamentEloToPlayerRatings } from './eloService';
+import { recalculateStandings } from './standingsService';
+import { serializeEventPlayer, serializeMatch, serializeRound } from './presenters';
 
 function normalizeName(name: string) {
-  return name.trim().replace(/\s+/g, " ").toLowerCase();
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 function normalizeDciNumber(dciNumber?: string) {
@@ -23,29 +23,24 @@ function normalizeDciNumber(dciNumber?: string) {
   return normalized ? normalized : null;
 }
 
-const VALID_BEST_OF_FORMATS = ["BO1", "BO3", "BO5", "FREE"] as const;
-type BestOfFormat = typeof VALID_BEST_OF_FORMATS[number];
+const VALID_BEST_OF_FORMATS = ['BO1', 'BO3', 'BO5', 'FREE'] as const;
+type BestOfFormat = (typeof VALID_BEST_OF_FORMATS)[number];
 
-
-function validateResult(
-  wins1: number,
-  wins2: number,
-  format: BestOfFormat
-): void {
+function validateResult(wins1: number, wins2: number, format: BestOfFormat): void {
   if (!Number.isInteger(wins1) || !Number.isInteger(wins2) || wins1 < 0 || wins2 < 0) {
-    throw new Error("Wins must be non-negative integers");
+    throw new Error('Wins must be non-negative integers');
   }
-  if (wins1 === 0 && wins2 === 0) throw new Error("Result cannot be 0-0");
+  if (wins1 === 0 && wins2 === 0) throw new Error('Result cannot be 0-0');
 
-  if (format === "BO1") {
-    if (wins1 > 1 || wins2 > 1) throw new Error("BO1: neither player can have more than 1 win");
-    if (wins1 === wins2) throw new Error("BO1: draws are not allowed");
-  } else if (format === "BO3") {
-    if (wins1 > 2 || wins2 > 2) throw new Error("BO3: neither player can have more than 2 wins");
-    if (wins1 === wins2 && wins1 !== 1) throw new Error("BO3: the only valid draw is 1-1");
-  } else if (format === "BO5") {
-    if (wins1 > 3 || wins2 > 3) throw new Error("BO5: neither player can have more than 3 wins");
-    if (wins1 === wins2 && wins1 !== 2) throw new Error("BO5: the only valid draw is 2-2");
+  if (format === 'BO1') {
+    if (wins1 > 1 || wins2 > 1) throw new Error('BO1: neither player can have more than 1 win');
+    if (wins1 === wins2) throw new Error('BO1: draws are not allowed');
+  } else if (format === 'BO3') {
+    if (wins1 > 2 || wins2 > 2) throw new Error('BO3: neither player can have more than 2 wins');
+    if (wins1 === wins2 && wins1 !== 1) throw new Error('BO3: the only valid draw is 1-1');
+  } else if (format === 'BO5') {
+    if (wins1 > 3 || wins2 > 3) throw new Error('BO5: neither player can have more than 3 wins');
+    if (wins1 === wins2 && wins1 !== 2) throw new Error('BO5: the only valid draw is 2-2');
   }
   // FREE: no restrictions
 }
@@ -58,15 +53,15 @@ export async function createTournament(data: {
   bestOfFormat?: string;
   totalRounds?: number;
 }) {
-  const bestOfFormat = (data.bestOfFormat ?? "BO3").toUpperCase();
+  const bestOfFormat = (data.bestOfFormat ?? 'BO3').toUpperCase();
   if (!VALID_BEST_OF_FORMATS.includes(bestOfFormat as BestOfFormat)) {
-    throw new Error(`Invalid bestOfFormat. Must be one of: ${VALID_BEST_OF_FORMATS.join(", ")}`);
+    throw new Error(`Invalid bestOfFormat. Must be one of: ${VALID_BEST_OF_FORMATS.join(', ')}`);
   }
   return prisma.tournament.create({
     data: {
       name: data.name,
-      format: data.format ?? "Cube",
-      subtitle: data.subtitle ?? "",
+      format: data.format ?? 'Cube',
+      subtitle: data.subtitle ?? '',
       cubeCobraUrl: data.cubeCobraUrl ?? null,
       bestOfFormat,
       totalRounds: data.totalRounds ?? 0,
@@ -78,17 +73,21 @@ export async function getTournament(id: string) {
   const tournament = await prisma.tournament.findUnique({
     where: { id },
     include: {
-      players: { where: { active: true }, orderBy: [{ seatNumber: "asc" }, { id: "asc" }], include: { player: { select: { avatarUrl: true } } } },
+      players: {
+        where: { active: true },
+        orderBy: [{ seatNumber: 'asc' }, { id: 'asc' }],
+        include: { player: { select: { avatarUrl: true } } },
+      },
       rounds: {
-        orderBy: { number: "asc" },
+        orderBy: { number: 'asc' },
         include: {
           matches: {
             include: { player1: true, player2: true },
-            orderBy: { tableNumber: "asc" },
+            orderBy: { tableNumber: 'asc' },
           },
         },
       },
-      standings: { include: { tournamentPlayer: true }, orderBy: { rank: "asc" } },
+      standings: { include: { tournamentPlayer: true }, orderBy: { rank: 'asc' } },
     },
   });
 
@@ -130,19 +129,22 @@ export async function getTournament(id: string) {
 
 export async function listTournaments() {
   return prisma.tournament.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: 'desc' },
     include: { _count: { select: { players: true } } },
   });
 }
 
-export async function createPlayer(data: { name: string; dciNumber?: string; elo?: number }, force = false) {
+export async function createPlayer(
+  data: { name: string; dciNumber?: string; elo?: number },
+  force = false,
+) {
   const name = data.name.trim();
-  if (!name) throw new Error("Player name is required");
+  if (!name) throw new Error('Player name is required');
 
   const dciNumber = normalizeDciNumber(data.dciNumber);
   if (dciNumber) {
     const existing = await prisma.player.findUnique({ where: { dciNumber } });
-    if (existing) throw new Error("Player with this DCI number already exists");
+    if (existing) throw new Error('Player with this DCI number already exists');
   }
 
   const normalizedName = normalizeName(name);
@@ -151,7 +153,7 @@ export async function createPlayer(data: { name: string; dciNumber?: string; elo
     if (duplicate) {
       const err = new Error(`A player named "${duplicate.name}" already exists`) as any;
       err.status = 409;
-      err.code = "DUPLICATE_NAME";
+      err.code = 'DUPLICATE_NAME';
       throw err;
     }
   }
@@ -173,14 +175,14 @@ export async function createPlayer(data: { name: string; dciNumber?: string; elo
 
 export async function addPlayer(
   tournamentId: string,
-  data: { name: string; dciNumber?: string; elo?: number }
+  data: { name: string; dciNumber?: string; elo?: number },
 ) {
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
     include: { players: { where: { active: true }, select: { id: true } } },
   });
-  if (!tournament) throw new Error("Tournament not found");
-  if (tournament.status !== "REGISTRATION") throw new Error("Tournament already started");
+  if (!tournament) throw new Error('Tournament not found');
+  if (tournament.status !== 'REGISTRATION') throw new Error('Tournament already started');
 
   const activePlayerCount = tournament.players.length;
   const name = data.name.trim();
@@ -188,9 +190,9 @@ export async function addPlayer(
   const normalizedName = normalizeName(name);
 
   const existingByName = await prisma.tournamentPlayer.findFirst({
-    where: { tournamentId, active: true, displayName: { equals: name, mode: "insensitive" } },
+    where: { tournamentId, active: true, displayName: { equals: name, mode: 'insensitive' } },
   });
-  if (existingByName) throw new Error("Player already added to this tournament");
+  if (existingByName) throw new Error('Player already added to this tournament');
 
   let matchedByNameFallback = false;
 
@@ -228,7 +230,7 @@ export async function addPlayer(
   }
 
   if (resolvedRegistration?.active) {
-    throw new Error("Player already added to this tournament");
+    throw new Error('Player already added to this tournament');
   }
 
   ensureTournamentHasCapacity(tournament.format, activePlayerCount);
@@ -281,7 +283,7 @@ export async function dropPlayer(playerId: string) {
 export async function deleteGlobalPlayer(id: string) {
   const registrations = await prisma.tournamentPlayer.count({ where: { playerId: id } });
   if (registrations > 0) {
-    const err = new Error("Cannot delete a player with tournament history.") as any;
+    const err = new Error('Cannot delete a player with tournament history.') as any;
     err.status = 409;
     throw err;
   }
@@ -295,17 +297,25 @@ export async function updatePlayerAvatar(id: string, avatarUrl: string) {
 
 export async function updateTournament(
   id: string,
-  data: { name?: string; format?: string; subtitle?: string; cubeCobraUrl?: string | null; totalRounds?: number }
+  data: {
+    name?: string;
+    format?: string;
+    subtitle?: string;
+    cubeCobraUrl?: string | null;
+    totalRounds?: number;
+  },
 ) {
   const tournament = await prisma.tournament.findUnique({ where: { id } });
-  if (!tournament) throw new Error("Tournament not found");
+  if (!tournament) throw new Error('Tournament not found');
 
   const updateData: Record<string, unknown> = {};
   if (data.name !== undefined) updateData.name = data.name.trim();
   if (data.subtitle !== undefined) updateData.subtitle = data.subtitle;
-  if ("cubeCobraUrl" in data) updateData.cubeCobraUrl = data.cubeCobraUrl ?? null;
-  if (data.format !== undefined && tournament.status === "REGISTRATION") updateData.format = data.format;
-  if (data.totalRounds !== undefined && tournament.status === "REGISTRATION") updateData.totalRounds = data.totalRounds;
+  if ('cubeCobraUrl' in data) updateData.cubeCobraUrl = data.cubeCobraUrl ?? null;
+  if (data.format !== undefined && tournament.status === 'REGISTRATION')
+    updateData.format = data.format;
+  if (data.totalRounds !== undefined && tournament.status === 'REGISTRATION')
+    updateData.totalRounds = data.totalRounds;
 
   return prisma.tournament.update({ where: { id }, data: updateData });
 }
@@ -318,15 +328,15 @@ export async function randomizeSeats(tournamentId: string) {
       rounds: { select: { id: true } },
     },
   });
-  if (!tournament) throw new Error("Tournament not found");
+  if (!tournament) throw new Error('Tournament not found');
   if (!usesDraftPodSeating(tournament.format)) {
-    throw new Error("Seat randomization is only available for Draft and Cube tournaments");
+    throw new Error('Seat randomization is only available for Draft and Cube tournaments');
   }
-  if (tournament.status !== "ACTIVE") {
-    throw new Error("Start the tournament before randomizing seats");
+  if (tournament.status !== 'ACTIVE') {
+    throw new Error('Start the tournament before randomizing seats');
   }
   if (tournament.currentRound > 0 || tournament.rounds.length > 0) {
-    throw new Error("Seats are locked once round 1 has been created");
+    throw new Error('Seats are locked once round 1 has been created');
   }
   validateTournamentPlayerCount(tournament.format, tournament.players.length);
 
@@ -338,8 +348,8 @@ export async function randomizeSeats(tournamentId: string) {
 
   await prisma.$transaction(
     players.map((player, index) =>
-      prisma.tournamentPlayer.update({ where: { id: player.id }, data: { seatNumber: index + 1 } })
-    )
+      prisma.tournamentPlayer.update({ where: { id: player.id }, data: { seatNumber: index + 1 } }),
+    ),
   );
 
   return { seated: players.length };
@@ -350,8 +360,8 @@ export async function startTournament(tournamentId: string) {
     where: { id: tournamentId },
     include: { players: { where: { active: true } } },
   });
-  if (!tournament) throw new Error("Tournament not found");
-  if (tournament.status !== "REGISTRATION") throw new Error("Tournament already started");
+  if (!tournament) throw new Error('Tournament not found');
+  if (tournament.status !== 'REGISTRATION') throw new Error('Tournament already started');
   validateTournamentPlayerCount(tournament.format, tournament.players.length);
 
   const totalRounds =
@@ -361,7 +371,7 @@ export async function startTournament(tournamentId: string) {
 
   return prisma.tournament.update({
     where: { id: tournamentId },
-    data: { status: "ACTIVE", totalRounds },
+    data: { status: 'ACTIVE', totalRounds },
   });
 }
 
@@ -370,37 +380,37 @@ export async function generateNextRound(tournamentId: string) {
     where: { id: tournamentId },
     include: {
       players: { where: { active: true } },
-      rounds: { include: { matches: true }, orderBy: { number: "desc" } },
+      rounds: { include: { matches: true }, orderBy: { number: 'desc' } },
       standings: true,
     },
   });
 
-  if (!tournament) throw new Error("Tournament not found");
-  if (tournament.status !== "ACTIVE") throw new Error("Tournament not active");
+  if (!tournament) throw new Error('Tournament not found');
+  if (tournament.status !== 'ACTIVE') throw new Error('Tournament not active');
 
   if (tournament.rounds.length > 0) {
     const lastRound = tournament.rounds[0];
-    if (lastRound.status !== "FINISHED") throw new Error("Previous round not finished");
+    if (lastRound.status !== 'FINISHED') throw new Error('Previous round not finished');
   }
 
   const newRoundNumber = tournament.rounds.length + 1;
-  if (newRoundNumber > tournament.totalRounds) throw new Error("All rounds completed");
+  if (newRoundNumber > tournament.totalRounds) throw new Error('All rounds completed');
 
   const allSeated = tournament.players.every((player: any) => player.seatNumber != null);
   const requiresSeatPairings = newRoundNumber === 1 && usesDraftPodSeating(tournament.format);
-  let pairings: ReturnType<typeof generatePairings>["pairings"];
+  let pairings: ReturnType<typeof generatePairings>['pairings'];
   let byePlayerId: string | null;
 
   if (requiresSeatPairings) {
     if (!allSeated) {
-      throw new Error("Randomize seats before generating round 1");
+      throw new Error('Randomize seats before generating round 1');
     }
 
     ({ pairings, byePlayerId } = generateSeatPairings(
       tournament.players.map((player: any) => ({
         id: player.id,
         seatNumber: player.seatNumber,
-      }))
+      })),
     ));
   } else {
     const playerStates = await buildPlayerStates(tournamentId);
@@ -409,7 +419,7 @@ export async function generateNextRound(tournamentId: string) {
 
   const round = await prisma.$transaction(async (tx: any) => {
     const round = await tx.round.create({
-      data: { tournamentId, number: newRoundNumber, status: "ACTIVE", startedAt: new Date() },
+      data: { tournamentId, number: newRoundNumber, status: 'ACTIVE', startedAt: new Date() },
     });
 
     for (const pairing of pairings) {
@@ -422,7 +432,7 @@ export async function generateNextRound(tournamentId: string) {
             player1TournamentPlayerId: pairing.player1Id,
             player2TournamentPlayerId: null,
             byeTournamentPlayerId: pairing.player1Id,
-            result: "BYE",
+            result: 'BYE',
             wins1: 2,
             wins2: 0,
             draws: 0,
@@ -436,7 +446,7 @@ export async function generateNextRound(tournamentId: string) {
             tableNumber: pairing.tableNumber,
             player1TournamentPlayerId: pairing.player1Id,
             player2TournamentPlayerId: pairing.player2Id,
-            result: "PENDING",
+            result: 'PENDING',
           },
         });
       }
@@ -457,7 +467,7 @@ export async function generateNextRound(tournamentId: string) {
     include: {
       matches: {
         include: { player1: true, player2: true },
-        orderBy: { tableNumber: "asc" },
+        orderBy: { tableNumber: 'asc' },
       },
     },
   });
@@ -469,37 +479,37 @@ export async function generateNextRound(tournamentId: string) {
 
 export async function reportResult(
   matchId: string,
-  data: { wins1: number; wins2: number; draws: number }
+  data: { wins1: number; wins2: number; draws: number },
 ) {
   const match = await prisma.match.findUnique({
     where: { id: matchId },
     include: { round: true, player1: { select: { tournamentId: true } } },
   });
-  if (!match) throw new Error("Match not found");
-  if (match.result === "BYE") throw new Error("Cannot edit a bye match");
+  if (!match) throw new Error('Match not found');
+  if (match.result === 'BYE') throw new Error('Cannot edit a bye match');
 
   // Validate against the tournament's best-of format
   const tournament = await prisma.tournament.findUnique({
     where: { id: match.tournamentId },
     select: { bestOfFormat: true, status: true },
   });
-  if (!tournament) throw new Error("Tournament not found");
-  if (tournament.status === "FINISHED") throw new Error("Tournament already finished");
+  if (!tournament) throw new Error('Tournament not found');
+  if (tournament.status === 'FINISHED') throw new Error('Tournament already finished');
   const bestOfFormat = tournament.bestOfFormat as BestOfFormat;
   validateResult(data.wins1, data.wins2, bestOfFormat);
 
   // If the round was already closed, reopen it so the edit is valid
-  if (match.round.status === "FINISHED") {
+  if (match.round.status === 'FINISHED') {
     await prisma.round.update({
       where: { id: match.roundId },
-      data: { status: "ACTIVE", finishedAt: null },
+      data: { status: 'ACTIVE', finishedAt: null },
     });
   }
 
-  let result: "P1_WIN" | "P2_WIN" | "DRAW";
-  if (data.wins1 > data.wins2) result = "P1_WIN";
-  else if (data.wins2 > data.wins1) result = "P2_WIN";
-  else result = "DRAW";
+  let result: 'P1_WIN' | 'P2_WIN' | 'DRAW';
+  if (data.wins1 > data.wins2) result = 'P1_WIN';
+  else if (data.wins2 > data.wins1) result = 'P2_WIN';
+  else result = 'DRAW';
 
   await prisma.match.update({
     where: { id: matchId },
@@ -508,13 +518,13 @@ export async function reportResult(
 
   // Re-check: if all matches in the round are now reported, close it again
   const pendingMatches = await prisma.match.count({
-    where: { roundId: match.roundId, result: "PENDING" },
+    where: { roundId: match.roundId, result: 'PENDING' },
   });
 
   if (pendingMatches === 0) {
     await prisma.round.update({
       where: { id: match.roundId },
-      data: { status: "FINISHED", finishedAt: new Date() },
+      data: { status: 'FINISHED', finishedAt: new Date() },
     });
   }
 
@@ -535,7 +545,7 @@ export async function finishTournament(tournamentId: string) {
     select: { id: true },
   });
 
-  if (!tournament) throw new Error("Tournament not found");
+  if (!tournament) throw new Error('Tournament not found');
 
   await recalculateTournamentElo(tournamentId);
 
@@ -543,7 +553,7 @@ export async function finishTournament(tournamentId: string) {
     await syncTournamentEloToPlayerRatings(tournamentId, tx);
     return tx.tournament.update({
       where: { id: tournamentId },
-      data: { status: "FINISHED" },
+      data: { status: 'FINISHED' },
     });
   });
 }
@@ -554,7 +564,7 @@ export async function deleteTournament(tournamentId: string) {
     select: { id: true, name: true },
   });
 
-  if (!tournament) throw new Error("Tournament not found");
+  if (!tournament) throw new Error('Tournament not found');
 
   await prisma.$transaction(async (tx: any) => {
     await tx.match.deleteMany({
@@ -586,7 +596,7 @@ function buildPlayerStats(registrations: any[]) {
     (acc: any, registration: any) => {
       acc.tournamentsPlayed += 1;
       if (registration.active) acc.activeRegistrations += 1;
-      if (registration.tournament.status === "FINISHED" && registration.standing?.rank === 1) {
+      if (registration.tournament.status === 'FINISHED' && registration.standing?.rank === 1) {
         acc.trophies += 1;
       }
       if (registration.standing) {
@@ -609,20 +619,18 @@ function buildPlayerStats(registrations: any[]) {
       gameWins: 0,
       gameLosses: 0,
       gameDraws: 0,
-    }
+    },
   );
 
   return {
     ...totals,
     matchWinRate:
       totals.matchWins + totals.matchLosses + totals.matchDraws > 0
-        ? totals.matchWins /
-          (totals.matchWins + totals.matchLosses + totals.matchDraws)
+        ? totals.matchWins / (totals.matchWins + totals.matchLosses + totals.matchDraws)
         : 0,
     gameWinRate:
       totals.gameWins + totals.gameLosses + totals.gameDraws > 0
-        ? totals.gameWins /
-          (totals.gameWins + totals.gameLosses + totals.gameDraws)
+        ? totals.gameWins / (totals.gameWins + totals.gameLosses + totals.gameDraws)
         : 0,
     lastTournamentAt: registrations[0]?.tournament.createdAt.toISOString() ?? null,
   };
@@ -652,7 +660,7 @@ function serializePlayerTournamentHistoryEntry(registration: any) {
     displayDciNumber: registration.displayDciNumber,
     startingElo: registration.startingElo,
     currentElo: registration.currentElo,
-    endingElo: registration.tournament.status === "FINISHED" ? registration.currentElo : null,
+    endingElo: registration.tournament.status === 'FINISHED' ? registration.currentElo : null,
     active: registration.active,
     rank: registration.standing?.rank ?? null,
     matchPoints: registration.standing?.matchPoints ?? 0,
@@ -679,10 +687,10 @@ export async function listPlayers() {
           tournament: true,
           standing: true,
         },
-        orderBy: { tournament: { createdAt: "desc" } },
+        orderBy: { tournament: { createdAt: 'desc' } },
       },
     },
-    orderBy: [{ rating: "desc" }, { name: "asc" }],
+    orderBy: [{ rating: 'desc' }, { name: 'asc' }],
   });
 
   return players.map((player: any) => {
@@ -703,7 +711,7 @@ export async function getPlayerSummary(playerId: string) {
           tournament: true,
           standing: true,
         },
-        orderBy: { tournament: { createdAt: "desc" } },
+        orderBy: { tournament: { createdAt: 'desc' } },
       },
     },
   });
@@ -718,12 +726,12 @@ export async function buildPlayerStates(tournamentId: string): Promise<PlayerSta
     where: { id: tournamentId },
     include: {
       players: { where: { active: true } },
-      rounds: { include: { matches: true }, where: { status: "FINISHED" } },
+      rounds: { include: { matches: true }, where: { status: 'FINISHED' } },
       standings: true,
     },
   });
 
-  if (!data) throw new Error("Tournament not found");
+  if (!data) throw new Error('Tournament not found');
 
   const opponents = new Map<string, string[]>();
   const hadBye = new Map<string, boolean>();
@@ -735,7 +743,10 @@ export async function buildPlayerStates(tournamentId: string): Promise<PlayerSta
 
   for (const round of data.rounds) {
     for (const match of round.matches) {
-      if (match.result === "BYE") { hadBye.set(match.player1TournamentPlayerId, true); continue; }
+      if (match.result === 'BYE') {
+        hadBye.set(match.player1TournamentPlayerId, true);
+        continue;
+      }
       if (!match.player2TournamentPlayerId) continue;
       opponents.get(match.player1TournamentPlayerId)?.push(match.player2TournamentPlayerId);
       opponents.get(match.player2TournamentPlayerId)?.push(match.player1TournamentPlayerId);

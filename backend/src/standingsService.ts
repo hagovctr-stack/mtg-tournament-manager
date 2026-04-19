@@ -1,10 +1,6 @@
-import { prisma } from "./db";
-import {
-  calculateTiebreakers,
-  type PlayerState,
-  type MatchRecord,
-} from "./pairingAlgorithm";
-import { serializeStanding } from "./presenters";
+import { prisma } from './db';
+import { calculateTiebreakers, type PlayerState, type MatchRecord } from './pairingAlgorithm';
+import { serializeStanding } from './presenters';
 
 export async function recalculateStandings(tournamentId: string): Promise<void> {
   const tournament = await prisma.tournament.findUnique({
@@ -13,12 +9,12 @@ export async function recalculateStandings(tournamentId: string): Promise<void> 
       players: { where: { active: true } },
       rounds: {
         include: { matches: true },
-        where: { status: { in: ["ACTIVE", "FINISHED"] } },
+        where: { status: { in: ['ACTIVE', 'FINISHED'] } },
       },
     },
   });
 
-  if (!tournament) throw new Error("Tournament not found");
+  if (!tournament) throw new Error('Tournament not found');
 
   type Stats = {
     matchPoints: number;
@@ -51,12 +47,12 @@ export async function recalculateStandings(tournamentId: string): Promise<void> 
 
   for (const round of tournament.rounds) {
     for (const match of round.matches) {
-      if (match.result === "PENDING") continue;
+      if (match.result === 'PENDING') continue;
 
       const s1 = statsMap.get(match.player1TournamentPlayerId);
       if (!s1) continue;
 
-      if (match.result === "BYE") {
+      if (match.result === 'BYE') {
         s1.matchPoints += 3;
         s1.matchWins += 1;
         s1.hadBye = true;
@@ -86,15 +82,15 @@ export async function recalculateStandings(tournamentId: string): Promise<void> 
       s2.gameLosses += w1;
       s2.gameDraws += d;
 
-      if (match.result === "P1_WIN") {
+      if (match.result === 'P1_WIN') {
         s1.matchPoints += 3;
         s1.matchWins += 1;
         s2.matchLosses += 1;
-      } else if (match.result === "P2_WIN") {
+      } else if (match.result === 'P2_WIN') {
         s2.matchPoints += 3;
         s2.matchWins += 1;
         s1.matchLosses += 1;
-      } else if (match.result === "DRAW") {
+      } else if (match.result === 'DRAW') {
         s1.matchPoints += 1;
         s2.matchPoints += 1;
         s1.matchDraws += 1;
@@ -120,7 +116,7 @@ export async function recalculateStandings(tournamentId: string): Promise<void> 
           opponentWins: w1,
           draws: d,
           isBye: false,
-        }
+        },
       );
     }
   }
@@ -191,7 +187,7 @@ export async function recalculateStandings(tournamentId: string): Promise<void> 
           rank: idx + 1,
         },
       });
-    })
+    }),
   );
 }
 
@@ -199,7 +195,7 @@ export async function getStandings(tournamentId: string) {
   const standings = await prisma.standing.findMany({
     where: { tournamentId },
     include: { tournamentPlayer: true },
-    orderBy: { rank: "asc" },
+    orderBy: { rank: 'asc' },
   });
 
   return standings.map(serializeStanding);
@@ -211,14 +207,14 @@ export async function getStandingsAtRound(tournamentId: string, upToRound: numbe
     include: {
       players: { where: { active: true } },
       rounds: {
-        where: { status: "FINISHED", number: { lte: upToRound } },
+        where: { status: 'FINISHED', number: { lte: upToRound } },
         include: { matches: true },
-        orderBy: { number: "asc" },
+        orderBy: { number: 'asc' },
       },
     },
   });
 
-  if (!tournament) throw new Error("Tournament not found");
+  if (!tournament) throw new Error('Tournament not found');
 
   type Stats = {
     matchPoints: number;
@@ -235,23 +231,39 @@ export async function getStandingsAtRound(tournamentId: string, upToRound: numbe
   const statsMap = new Map<string, Stats>();
   for (const player of tournament.players) {
     statsMap.set(player.id, {
-      matchPoints: 0, matchWins: 0, matchLosses: 0, matchDraws: 0,
-      gameWins: 0, gameLosses: 0, gameDraws: 0, opponents: [], hadBye: false,
+      matchPoints: 0,
+      matchWins: 0,
+      matchLosses: 0,
+      matchDraws: 0,
+      gameWins: 0,
+      gameLosses: 0,
+      gameDraws: 0,
+      opponents: [],
+      hadBye: false,
     });
   }
 
-  const matchRecords: import("./pairingAlgorithm").MatchRecord[] = [];
+  const matchRecords: import('./pairingAlgorithm').MatchRecord[] = [];
 
   for (const round of tournament.rounds) {
     for (const match of round.matches) {
-      if (match.result === "PENDING") continue;
+      if (match.result === 'PENDING') continue;
 
       const s1 = statsMap.get(match.player1TournamentPlayerId);
       if (!s1) continue;
 
-      if (match.result === "BYE") {
-        s1.matchPoints += 3; s1.matchWins += 1; s1.hadBye = true;
-        matchRecords.push({ playerId: match.player1TournamentPlayerId, opponentId: null, playerWins: 2, opponentWins: 0, draws: 0, isBye: true });
+      if (match.result === 'BYE') {
+        s1.matchPoints += 3;
+        s1.matchWins += 1;
+        s1.hadBye = true;
+        matchRecords.push({
+          playerId: match.player1TournamentPlayerId,
+          opponentId: null,
+          playerWins: 2,
+          opponentWins: 0,
+          draws: 0,
+          isBye: true,
+        });
         continue;
       }
 
@@ -259,34 +271,82 @@ export async function getStandingsAtRound(tournamentId: string, upToRound: numbe
       const s2 = statsMap.get(match.player2TournamentPlayerId);
       if (!s2) continue;
 
-      const w1 = match.wins1 ?? 0, w2 = match.wins2 ?? 0, d = match.draws ?? 0;
-      s1.gameWins += w1; s1.gameLosses += w2; s1.gameDraws += d;
-      s2.gameWins += w2; s2.gameLosses += w1; s2.gameDraws += d;
+      const w1 = match.wins1 ?? 0,
+        w2 = match.wins2 ?? 0,
+        d = match.draws ?? 0;
+      s1.gameWins += w1;
+      s1.gameLosses += w2;
+      s1.gameDraws += d;
+      s2.gameWins += w2;
+      s2.gameLosses += w1;
+      s2.gameDraws += d;
 
-      if (match.result === "P1_WIN") { s1.matchPoints += 3; s1.matchWins += 1; s2.matchLosses += 1; }
-      else if (match.result === "P2_WIN") { s2.matchPoints += 3; s2.matchWins += 1; s1.matchLosses += 1; }
-      else if (match.result === "DRAW") { s1.matchPoints += 1; s2.matchPoints += 1; s1.matchDraws += 1; s2.matchDraws += 1; }
+      if (match.result === 'P1_WIN') {
+        s1.matchPoints += 3;
+        s1.matchWins += 1;
+        s2.matchLosses += 1;
+      } else if (match.result === 'P2_WIN') {
+        s2.matchPoints += 3;
+        s2.matchWins += 1;
+        s1.matchLosses += 1;
+      } else if (match.result === 'DRAW') {
+        s1.matchPoints += 1;
+        s2.matchPoints += 1;
+        s1.matchDraws += 1;
+        s2.matchDraws += 1;
+      }
 
       s1.opponents.push(match.player2TournamentPlayerId);
       s2.opponents.push(match.player1TournamentPlayerId);
 
       matchRecords.push(
-        { playerId: match.player1TournamentPlayerId, opponentId: match.player2TournamentPlayerId, playerWins: w1, opponentWins: w2, draws: d, isBye: false },
-        { playerId: match.player2TournamentPlayerId, opponentId: match.player1TournamentPlayerId, playerWins: w2, opponentWins: w1, draws: d, isBye: false },
+        {
+          playerId: match.player1TournamentPlayerId,
+          opponentId: match.player2TournamentPlayerId,
+          playerWins: w1,
+          opponentWins: w2,
+          draws: d,
+          isBye: false,
+        },
+        {
+          playerId: match.player2TournamentPlayerId,
+          opponentId: match.player1TournamentPlayerId,
+          playerWins: w2,
+          opponentWins: w1,
+          draws: d,
+          isBye: false,
+        },
       );
     }
   }
 
-  const playerStates: import("./pairingAlgorithm").PlayerState[] = tournament.players.map((p: any) => {
-    const s = statsMap.get(p.id)!;
-    return { id: p.id, name: p.displayName, matchPoints: s.matchPoints, matchWins: s.matchWins, matchLosses: s.matchLosses, matchDraws: s.matchDraws, opponents: s.opponents, floatHistory: [], hadBye: s.hadBye, tiebreaker1: 0, tiebreaker2: 0, tiebreaker3: 0 };
-  });
+  const playerStates: import('./pairingAlgorithm').PlayerState[] = tournament.players.map(
+    (p: any) => {
+      const s = statsMap.get(p.id)!;
+      return {
+        id: p.id,
+        name: p.displayName,
+        matchPoints: s.matchPoints,
+        matchWins: s.matchWins,
+        matchLosses: s.matchLosses,
+        matchDraws: s.matchDraws,
+        opponents: s.opponents,
+        floatHistory: [],
+        hadBye: s.hadBye,
+        tiebreaker1: 0,
+        tiebreaker2: 0,
+        tiebreaker3: 0,
+      };
+    },
+  );
 
   const tiebreakers = calculateTiebreakers(playerStates, matchRecords);
 
   const sorted = playerStates.sort((a, b) => {
-    const ta = tiebreakers.get(a.id)!, tb = tiebreakers.get(b.id)!;
-    const sa = statsMap.get(a.id)!, sb = statsMap.get(b.id)!;
+    const ta = tiebreakers.get(a.id)!,
+      tb = tiebreakers.get(b.id)!;
+    const sa = statsMap.get(a.id)!,
+      sb = statsMap.get(b.id)!;
     if (sa.matchPoints !== sb.matchPoints) return sb.matchPoints - sa.matchPoints;
     if (ta.omw !== tb.omw) return tb.omw - ta.omw;
     if (ta.gw !== tb.gw) return tb.gw - ta.gw;

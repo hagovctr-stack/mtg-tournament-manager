@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
-import { api, type Standing, type TournamentDetail } from "../api";
-import { StandingsTable } from "../components/StandingsTable";
-import { joinTournament, getSocket } from "../socket";
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { api, type Standing, type TournamentDetail } from '../api';
+import { StandingsTable } from '../components/StandingsTable';
+import { joinTournament, getSocket } from '../socket';
 
 export function Standings() {
   const { id } = useParams<{ id: string }>();
@@ -16,25 +16,29 @@ export function Standings() {
     setStandings(t.standings);
   }, [id]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   useEffect(() => {
     document.title = tournament
       ? `Standings | ${tournament.name} | MTG Tournament Manager`
-      : "Standings | MTG Tournament Manager";
+      : 'Standings | MTG Tournament Manager';
   }, [tournament]);
 
   useEffect(() => {
     if (!id) return;
     joinTournament(id);
     const socket = getSocket();
-    socket.on("standings_updated", refresh);
-    return () => { socket.off("standings_updated", refresh); };
+    socket.on('standings_updated', refresh);
+    return () => {
+      socket.off('standings_updated', refresh);
+    };
   }, [id, refresh]);
 
   const finishedRounds = tournament
     ? tournament.rounds
-        .filter((r) => r.status === "FINISHED")
+        .filter((r) => r.status === 'FINISHED')
         .map((r) => r.number)
         .sort((a, b) => a - b)
     : [];
@@ -42,7 +46,7 @@ export function Standings() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">{tournament?.name ?? ""}</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{tournament?.name ?? ''}</h1>
         <p className="text-sm text-gray-500">Live Standings</p>
       </div>
       <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -51,7 +55,7 @@ export function Standings() {
             tournamentId={id}
             standings={standings}
             finishedRounds={finishedRounds}
-            finished={tournament?.status === "FINISHED"}
+            finished={tournament?.status === 'FINISHED'}
           />
         )}
       </div>

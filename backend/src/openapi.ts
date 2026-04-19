@@ -1,36 +1,35 @@
 export const openApiDocument = {
-  openapi: "3.0.3",
+  openapi: '3.0.3',
   info: {
-    title: "MTG Tournament Manager API",
-    version: "1.0.0",
-    description: "REST API for managing MTG Swiss tournaments, players, rounds, standings, and exports.",
+    title: 'MTG Tournament Manager API',
+    version: '1.0.0',
+    description:
+      'REST API for managing MTG Swiss tournaments, players, rounds, standings, and exports.',
   },
-  servers: [
-    { url: "http://localhost:3001", description: "Local backend" },
-  ],
+  servers: [{ url: 'http://localhost:3001', description: 'Local backend' }],
   tags: [
-    { name: "Health" },
-    { name: "Tournaments" },
-    { name: "Players" },
-    { name: "Rounds" },
-    { name: "Matches" },
-    { name: "Standings" },
-    { name: "Export" },
+    { name: 'Health' },
+    { name: 'Tournaments' },
+    { name: 'Players' },
+    { name: 'Rounds' },
+    { name: 'Matches' },
+    { name: 'Standings' },
+    { name: 'Export' },
   ],
   paths: {
-    "/health": {
+    '/health': {
       get: {
-        tags: ["Health"],
-        summary: "Health check",
+        tags: ['Health'],
+        summary: 'Health check',
         responses: {
-          "200": {
-            description: "Backend is healthy",
+          '200': {
+            description: 'Backend is healthy',
             content: {
-              "application/json": {
+              'application/json': {
                 schema: {
-                  type: "object",
-                  properties: { ok: { type: "boolean", example: true } },
-                  required: ["ok"],
+                  type: 'object',
+                  properties: { ok: { type: 'boolean', example: true } },
+                  required: ['ok'],
                 },
               },
             },
@@ -38,18 +37,18 @@ export const openApiDocument = {
         },
       },
     },
-    "/api/tournaments": {
+    '/api/tournaments': {
       get: {
-        tags: ["Tournaments"],
-        summary: "List tournaments",
+        tags: ['Tournaments'],
+        summary: 'List tournaments',
         responses: {
-          "200": {
-            description: "List of tournaments",
+          '200': {
+            description: 'List of tournaments',
             content: {
-              "application/json": {
+              'application/json': {
                 schema: {
-                  type: "array",
-                  items: { $ref: "#/components/schemas/Tournament" },
+                  type: 'array',
+                  items: { $ref: '#/components/schemas/Tournament' },
                 },
               },
             },
@@ -57,144 +56,144 @@ export const openApiDocument = {
         },
       },
       post: {
-        tags: ["Tournaments"],
-        summary: "Create tournament",
+        tags: ['Tournaments'],
+        summary: 'Create tournament',
         requestBody: {
           required: true,
           content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/CreateTournamentInput" },
+            'application/json': {
+              schema: { $ref: '#/components/schemas/CreateTournamentInput' },
             },
           },
         },
         responses: {
-          "201": {
-            description: "Tournament created",
+          '201': {
+            description: 'Tournament created',
             content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/Tournament" },
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Tournament' },
               },
             },
           },
-          "400": { $ref: "#/components/responses/ErrorResponse" },
+          '400': { $ref: '#/components/responses/ErrorResponse' },
         },
       },
     },
-    "/api/tournaments/{id}": {
+    '/api/tournaments/{id}': {
       get: {
-        tags: ["Tournaments"],
-        summary: "Get tournament detail",
-        parameters: [{ $ref: "#/components/parameters/TournamentId" }],
+        tags: ['Tournaments'],
+        summary: 'Get tournament detail',
+        parameters: [{ $ref: '#/components/parameters/TournamentId' }],
         responses: {
-          "200": {
-            description: "Tournament detail",
+          '200': {
+            description: 'Tournament detail',
             content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/TournamentDetail" },
+              'application/json': {
+                schema: { $ref: '#/components/schemas/TournamentDetail' },
               },
             },
           },
-          "404": { $ref: "#/components/responses/ErrorResponse" },
+          '404': { $ref: '#/components/responses/ErrorResponse' },
         },
       },
       delete: {
-        tags: ["Tournaments"],
-        summary: "Delete tournament",
-        parameters: [{ $ref: "#/components/parameters/TournamentId" }],
+        tags: ['Tournaments'],
+        summary: 'Delete tournament',
+        parameters: [{ $ref: '#/components/parameters/TournamentId' }],
         responses: {
-          "200": {
-            description: "Deleted tournament summary",
+          '200': {
+            description: 'Deleted tournament summary',
             content: {
-              "application/json": {
+              'application/json': {
                 schema: {
-                  type: "object",
+                  type: 'object',
                   properties: {
-                    id: { type: "string" },
-                    name: { type: "string" },
+                    id: { type: 'string' },
+                    name: { type: 'string' },
                   },
-                  required: ["id", "name"],
+                  required: ['id', 'name'],
                 },
               },
             },
           },
-          "400": { $ref: "#/components/responses/ErrorResponse" },
+          '400': { $ref: '#/components/responses/ErrorResponse' },
         },
       },
     },
-    "/api/tournaments/{id}/start": {
+    '/api/tournaments/{id}/start': {
       post: {
-        tags: ["Tournaments"],
-        summary: "Start tournament",
-        parameters: [{ $ref: "#/components/parameters/TournamentId" }],
+        tags: ['Tournaments'],
+        summary: 'Start tournament',
+        parameters: [{ $ref: '#/components/parameters/TournamentId' }],
         responses: {
-          "200": {
-            description: "Tournament started",
+          '200': {
+            description: 'Tournament started',
             content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/Tournament" },
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Tournament' },
               },
             },
           },
-          "400": { $ref: "#/components/responses/ErrorResponse" },
+          '400': { $ref: '#/components/responses/ErrorResponse' },
         },
       },
     },
-    "/api/tournaments/{id}/finish": {
+    '/api/tournaments/{id}/finish': {
       post: {
-        tags: ["Tournaments"],
-        summary: "Finish tournament",
-        parameters: [{ $ref: "#/components/parameters/TournamentId" }],
+        tags: ['Tournaments'],
+        summary: 'Finish tournament',
+        parameters: [{ $ref: '#/components/parameters/TournamentId' }],
         responses: {
-          "200": {
-            description: "Tournament finished",
+          '200': {
+            description: 'Tournament finished',
             content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/Tournament" },
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Tournament' },
               },
             },
           },
-          "400": { $ref: "#/components/responses/ErrorResponse" },
+          '400': { $ref: '#/components/responses/ErrorResponse' },
         },
       },
     },
-    "/api/tournaments/{id}/players": {
+    '/api/tournaments/{id}/players': {
       post: {
-        tags: ["Players"],
-        summary: "Add player to tournament",
-        parameters: [{ $ref: "#/components/parameters/TournamentId" }],
+        tags: ['Players'],
+        summary: 'Add player to tournament',
+        parameters: [{ $ref: '#/components/parameters/TournamentId' }],
         requestBody: {
           required: true,
           content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/AddPlayerInput" },
+            'application/json': {
+              schema: { $ref: '#/components/schemas/AddPlayerInput' },
             },
           },
         },
         responses: {
-          "201": {
-            description: "Player created",
+          '201': {
+            description: 'Player created',
             content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/Player" },
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Player' },
               },
             },
           },
-          "400": { $ref: "#/components/responses/ErrorResponse" },
+          '400': { $ref: '#/components/responses/ErrorResponse' },
         },
       },
     },
-    "/api/players": {
+    '/api/players': {
       get: {
-        tags: ["Players"],
-        summary: "List global players with aggregate stats",
+        tags: ['Players'],
+        summary: 'List global players with aggregate stats',
         responses: {
-          "200": {
-            description: "List of global players",
+          '200': {
+            description: 'List of global players',
             content: {
-              "application/json": {
+              'application/json': {
                 schema: {
-                  type: "array",
-                  items: { $ref: "#/components/schemas/PlayerListItem" },
+                  type: 'array',
+                  items: { $ref: '#/components/schemas/PlayerListItem' },
                 },
               },
             },
@@ -202,122 +201,122 @@ export const openApiDocument = {
         },
       },
       post: {
-        tags: ["Players"],
-        summary: "Create global player profile",
+        tags: ['Players'],
+        summary: 'Create global player profile',
         requestBody: {
           required: true,
           content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/AddPlayerInput" },
+            'application/json': {
+              schema: { $ref: '#/components/schemas/AddPlayerInput' },
             },
           },
         },
         responses: {
-          "201": {
-            description: "Global player created",
+          '201': {
+            description: 'Global player created',
             content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/PlayerListItem" },
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PlayerListItem' },
               },
             },
           },
-          "400": { $ref: "#/components/responses/ErrorResponse" },
+          '400': { $ref: '#/components/responses/ErrorResponse' },
         },
       },
     },
-    "/api/players/{id}": {
+    '/api/players/{id}': {
       delete: {
-        tags: ["Players"],
-        summary: "Drop player from tournament",
-        parameters: [{ $ref: "#/components/parameters/PlayerId" }],
+        tags: ['Players'],
+        summary: 'Drop player from tournament',
+        parameters: [{ $ref: '#/components/parameters/PlayerId' }],
         responses: {
-          "200": {
-            description: "Player dropped",
+          '200': {
+            description: 'Player dropped',
             content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/Player" },
+              'application/json': {
+                schema: { $ref: '#/components/schemas/Player' },
               },
             },
           },
-          "400": { $ref: "#/components/responses/ErrorResponse" },
+          '400': { $ref: '#/components/responses/ErrorResponse' },
         },
       },
     },
-    "/api/players/{id}/summary": {
+    '/api/players/{id}/summary': {
       get: {
-        tags: ["Players"],
-        summary: "Get global player summary and lifetime stats",
-        parameters: [{ $ref: "#/components/parameters/PlayerId" }],
+        tags: ['Players'],
+        summary: 'Get global player summary and lifetime stats',
+        parameters: [{ $ref: '#/components/parameters/PlayerId' }],
         responses: {
-          "200": {
-            description: "Global player summary",
+          '200': {
+            description: 'Global player summary',
             content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/PlayerSummary" },
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PlayerSummary' },
               },
             },
           },
-          "404": { $ref: "#/components/responses/ErrorResponse" },
+          '404': { $ref: '#/components/responses/ErrorResponse' },
         },
       },
     },
-    "/api/tournaments/{id}/rounds": {
+    '/api/tournaments/{id}/rounds': {
       post: {
-        tags: ["Rounds"],
-        summary: "Generate next round",
-        parameters: [{ $ref: "#/components/parameters/TournamentId" }],
+        tags: ['Rounds'],
+        summary: 'Generate next round',
+        parameters: [{ $ref: '#/components/parameters/TournamentId' }],
         responses: {
-          "201": {
-            description: "Round generated",
+          '201': {
+            description: 'Round generated',
             content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/RoundDetail" },
+              'application/json': {
+                schema: { $ref: '#/components/schemas/RoundDetail' },
               },
             },
           },
-          "400": { $ref: "#/components/responses/ErrorResponse" },
+          '400': { $ref: '#/components/responses/ErrorResponse' },
         },
       },
     },
-    "/api/matches/{id}/result": {
+    '/api/matches/{id}/result': {
       patch: {
-        tags: ["Matches"],
-        summary: "Report match result",
-        parameters: [{ $ref: "#/components/parameters/MatchId" }],
+        tags: ['Matches'],
+        summary: 'Report match result',
+        parameters: [{ $ref: '#/components/parameters/MatchId' }],
         requestBody: {
           required: true,
           content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/ReportResultInput" },
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ReportResultInput' },
             },
           },
         },
         responses: {
-          "200": {
-            description: "Match updated",
+          '200': {
+            description: 'Match updated',
             content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/MatchDetail" },
+              'application/json': {
+                schema: { $ref: '#/components/schemas/MatchDetail' },
               },
             },
           },
-          "400": { $ref: "#/components/responses/ErrorResponse" },
+          '400': { $ref: '#/components/responses/ErrorResponse' },
         },
       },
     },
-    "/api/tournaments/{id}/standings": {
+    '/api/tournaments/{id}/standings': {
       get: {
-        tags: ["Standings"],
-        summary: "Get standings",
-        parameters: [{ $ref: "#/components/parameters/TournamentId" }],
+        tags: ['Standings'],
+        summary: 'Get standings',
+        parameters: [{ $ref: '#/components/parameters/TournamentId' }],
         responses: {
-          "200": {
-            description: "Standings",
+          '200': {
+            description: 'Standings',
             content: {
-              "application/json": {
+              'application/json': {
                 schema: {
-                  type: "array",
-                  items: { $ref: "#/components/schemas/Standing" },
+                  type: 'array',
+                  items: { $ref: '#/components/schemas/Standing' },
                 },
               },
             },
@@ -325,17 +324,17 @@ export const openApiDocument = {
         },
       },
     },
-    "/api/tournaments/{id}/export": {
+    '/api/tournaments/{id}/export': {
       get: {
-        tags: ["Export"],
-        summary: "Export standings as CSV",
-        parameters: [{ $ref: "#/components/parameters/TournamentId" }],
+        tags: ['Export'],
+        summary: 'Export standings as CSV',
+        parameters: [{ $ref: '#/components/parameters/TournamentId' }],
         responses: {
-          "200": {
-            description: "CSV export",
+          '200': {
+            description: 'CSV export',
             content: {
-              "text/csv": {
-                schema: { type: "string" },
+              'text/csv': {
+                schema: { type: 'string' },
               },
             },
           },
@@ -346,38 +345,38 @@ export const openApiDocument = {
   components: {
     parameters: {
       TournamentId: {
-        name: "id",
-        in: "path",
+        name: 'id',
+        in: 'path',
         required: true,
-        schema: { type: "string" },
-        description: "Tournament id",
+        schema: { type: 'string' },
+        description: 'Tournament id',
       },
       PlayerId: {
-        name: "id",
-        in: "path",
+        name: 'id',
+        in: 'path',
         required: true,
-        schema: { type: "string" },
-        description: "Player id",
+        schema: { type: 'string' },
+        description: 'Player id',
       },
       MatchId: {
-        name: "id",
-        in: "path",
+        name: 'id',
+        in: 'path',
         required: true,
-        schema: { type: "string" },
-        description: "Match id",
+        schema: { type: 'string' },
+        description: 'Match id',
       },
     },
     responses: {
       ErrorResponse: {
-        description: "Error response",
+        description: 'Error response',
         content: {
-          "application/json": {
+          'application/json': {
             schema: {
-              type: "object",
+              type: 'object',
               properties: {
-                error: { type: "string" },
+                error: { type: 'string' },
               },
-              required: ["error"],
+              required: ['error'],
             },
           },
         },
@@ -385,285 +384,300 @@ export const openApiDocument = {
     },
     schemas: {
       Tournament: {
-        type: "object",
+        type: 'object',
         properties: {
-          id: { type: "string" },
-          name: { type: "string" },
-          format: { type: "string" },
-          status: { type: "string", enum: ["REGISTRATION", "ACTIVE", "FINISHED"] },
-          totalRounds: { type: "integer" },
-          currentRound: { type: "integer" },
-          createdAt: { type: "string", format: "date-time" },
-          updatedAt: { type: "string", format: "date-time" },
+          id: { type: 'string' },
+          name: { type: 'string' },
+          format: { type: 'string' },
+          status: { type: 'string', enum: ['REGISTRATION', 'ACTIVE', 'FINISHED'] },
+          totalRounds: { type: 'integer' },
+          currentRound: { type: 'integer' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
           _count: {
-            type: "object",
+            type: 'object',
             properties: {
-              players: { type: "integer" },
+              players: { type: 'integer' },
             },
           },
         },
-        required: ["id", "name", "format", "status", "totalRounds", "currentRound", "createdAt", "updatedAt"],
+        required: [
+          'id',
+          'name',
+          'format',
+          'status',
+          'totalRounds',
+          'currentRound',
+          'createdAt',
+          'updatedAt',
+        ],
       },
       TournamentDetail: {
         allOf: [
-          { $ref: "#/components/schemas/Tournament" },
+          { $ref: '#/components/schemas/Tournament' },
           {
-            type: "object",
+            type: 'object',
             properties: {
               players: {
-                type: "array",
-                items: { $ref: "#/components/schemas/Player" },
+                type: 'array',
+                items: { $ref: '#/components/schemas/Player' },
               },
               rounds: {
-                type: "array",
-                items: { $ref: "#/components/schemas/RoundDetail" },
+                type: 'array',
+                items: { $ref: '#/components/schemas/RoundDetail' },
               },
               standings: {
-                type: "array",
-                items: { $ref: "#/components/schemas/Standing" },
+                type: 'array',
+                items: { $ref: '#/components/schemas/Standing' },
               },
             },
-            required: ["players", "rounds", "standings"],
+            required: ['players', 'rounds', 'standings'],
           },
         ],
       },
       Player: {
-        type: "object",
+        type: 'object',
         properties: {
-          id: { type: "string" },
-          tournamentPlayerId: { type: "string" },
-          playerId: { type: "string", nullable: true },
-          name: { type: "string" },
-          dciNumber: { type: "string", nullable: true },
-          elo: { type: "integer" },
-          active: { type: "boolean" },
-          tournamentId: { type: "string" },
+          id: { type: 'string' },
+          tournamentPlayerId: { type: 'string' },
+          playerId: { type: 'string', nullable: true },
+          name: { type: 'string' },
+          dciNumber: { type: 'string', nullable: true },
+          elo: { type: 'integer' },
+          active: { type: 'boolean' },
+          tournamentId: { type: 'string' },
         },
-        required: ["id", "tournamentPlayerId", "name", "elo", "active", "tournamentId"],
+        required: ['id', 'tournamentPlayerId', 'name', 'elo', 'active', 'tournamentId'],
       },
       Match: {
-        type: "object",
+        type: 'object',
         properties: {
-          id: { type: "string" },
-          tableNumber: { type: "integer" },
-          player1Id: { type: "string" },
-          player2Id: { type: "string", nullable: true },
-          wins1: { type: "integer", nullable: true },
-          wins2: { type: "integer", nullable: true },
-          draws: { type: "integer", nullable: true },
-          result: { type: "string", enum: ["PENDING", "P1_WIN", "P2_WIN", "DRAW", "BYE"] },
-          tournamentId: { type: "string" },
+          id: { type: 'string' },
+          tableNumber: { type: 'integer' },
+          player1Id: { type: 'string' },
+          player2Id: { type: 'string', nullable: true },
+          wins1: { type: 'integer', nullable: true },
+          wins2: { type: 'integer', nullable: true },
+          draws: { type: 'integer', nullable: true },
+          result: { type: 'string', enum: ['PENDING', 'P1_WIN', 'P2_WIN', 'DRAW', 'BYE'] },
+          tournamentId: { type: 'string' },
         },
-        required: ["id", "tableNumber", "player1Id", "result", "tournamentId"],
+        required: ['id', 'tableNumber', 'player1Id', 'result', 'tournamentId'],
       },
       MatchDetail: {
         allOf: [
-          { $ref: "#/components/schemas/Match" },
+          { $ref: '#/components/schemas/Match' },
           {
-            type: "object",
+            type: 'object',
             properties: {
-              player1: { $ref: "#/components/schemas/Player" },
+              player1: { $ref: '#/components/schemas/Player' },
               player2: {
-                anyOf: [
-                  { $ref: "#/components/schemas/Player" },
-                  { type: "null" },
-                ],
+                anyOf: [{ $ref: '#/components/schemas/Player' }, { type: 'null' }],
               },
             },
-            required: ["player1", "player2"],
+            required: ['player1', 'player2'],
           },
         ],
       },
       Round: {
-        type: "object",
+        type: 'object',
         properties: {
-          id: { type: "string" },
-          number: { type: "integer" },
-          status: { type: "string", enum: ["PENDING", "ACTIVE", "FINISHED"] },
-          startedAt: { type: "string", format: "date-time", nullable: true },
+          id: { type: 'string' },
+          number: { type: 'integer' },
+          status: { type: 'string', enum: ['PENDING', 'ACTIVE', 'FINISHED'] },
+          startedAt: { type: 'string', format: 'date-time', nullable: true },
           matches: {
-            type: "array",
-            items: { $ref: "#/components/schemas/Match" },
+            type: 'array',
+            items: { $ref: '#/components/schemas/Match' },
           },
         },
-        required: ["id", "number", "status", "matches"],
+        required: ['id', 'number', 'status', 'matches'],
       },
       RoundDetail: {
         allOf: [
-          { $ref: "#/components/schemas/Round" },
+          { $ref: '#/components/schemas/Round' },
           {
-            type: "object",
+            type: 'object',
             properties: {
               matches: {
-                type: "array",
-                items: { $ref: "#/components/schemas/MatchDetail" },
+                type: 'array',
+                items: { $ref: '#/components/schemas/MatchDetail' },
               },
             },
-            required: ["matches"],
+            required: ['matches'],
           },
         ],
       },
       Standing: {
-        type: "object",
+        type: 'object',
         properties: {
-          id: { type: "string" },
-          tournamentId: { type: "string" },
-          tournamentPlayerId: { type: "string" },
-          playerId: { type: "string", nullable: true },
-          rank: { type: "integer" },
-          matchPoints: { type: "integer" },
-          matchWins: { type: "integer" },
-          matchLosses: { type: "integer" },
-          matchDraws: { type: "integer" },
-          gameWins: { type: "integer" },
-          gameLosses: { type: "integer" },
-          omwPercent: { type: "number" },
-          gwPercent: { type: "number" },
-          ogwPercent: { type: "number" },
-          player: { $ref: "#/components/schemas/Player" },
+          id: { type: 'string' },
+          tournamentId: { type: 'string' },
+          tournamentPlayerId: { type: 'string' },
+          playerId: { type: 'string', nullable: true },
+          rank: { type: 'integer' },
+          matchPoints: { type: 'integer' },
+          matchWins: { type: 'integer' },
+          matchLosses: { type: 'integer' },
+          matchDraws: { type: 'integer' },
+          gameWins: { type: 'integer' },
+          gameLosses: { type: 'integer' },
+          omwPercent: { type: 'number' },
+          gwPercent: { type: 'number' },
+          ogwPercent: { type: 'number' },
+          player: { $ref: '#/components/schemas/Player' },
         },
         required: [
-          "id",
-          "tournamentId",
-          "tournamentPlayerId",
-          "rank",
-          "matchPoints",
-          "matchWins",
-          "matchLosses",
-          "matchDraws",
-          "gameWins",
-          "gameLosses",
-          "omwPercent",
-          "gwPercent",
-          "ogwPercent",
-          "player",
+          'id',
+          'tournamentId',
+          'tournamentPlayerId',
+          'rank',
+          'matchPoints',
+          'matchWins',
+          'matchLosses',
+          'matchDraws',
+          'gameWins',
+          'gameLosses',
+          'omwPercent',
+          'gwPercent',
+          'ogwPercent',
+          'player',
         ],
       },
       PlayerStats: {
-        type: "object",
+        type: 'object',
         properties: {
-          tournamentsPlayed: { type: "integer" },
-          activeRegistrations: { type: "integer" },
-          matchWins: { type: "integer" },
-          matchLosses: { type: "integer" },
-          matchDraws: { type: "integer" },
-          gameWins: { type: "integer" },
-          gameLosses: { type: "integer" },
-          gameDraws: { type: "integer" },
-          matchWinRate: { type: "number" },
-          gameWinRate: { type: "number" },
-          lastTournamentAt: { type: "string", format: "date-time", nullable: true },
+          tournamentsPlayed: { type: 'integer' },
+          activeRegistrations: { type: 'integer' },
+          matchWins: { type: 'integer' },
+          matchLosses: { type: 'integer' },
+          matchDraws: { type: 'integer' },
+          gameWins: { type: 'integer' },
+          gameLosses: { type: 'integer' },
+          gameDraws: { type: 'integer' },
+          matchWinRate: { type: 'number' },
+          gameWinRate: { type: 'number' },
+          lastTournamentAt: { type: 'string', format: 'date-time', nullable: true },
         },
         required: [
-          "tournamentsPlayed",
-          "activeRegistrations",
-          "matchWins",
-          "matchLosses",
-          "matchDraws",
-          "gameWins",
-          "gameLosses",
-          "gameDraws",
-          "matchWinRate",
-          "gameWinRate",
-          "lastTournamentAt",
+          'tournamentsPlayed',
+          'activeRegistrations',
+          'matchWins',
+          'matchLosses',
+          'matchDraws',
+          'gameWins',
+          'gameLosses',
+          'gameDraws',
+          'matchWinRate',
+          'gameWinRate',
+          'lastTournamentAt',
         ],
       },
       PlayerTournamentHistoryEntry: {
-        type: "object",
+        type: 'object',
         properties: {
-          tournamentId: { type: "string" },
-          tournamentPlayerId: { type: "string" },
-          name: { type: "string" },
-          status: { type: "string" },
-          playedAt: { type: "string", format: "date-time" },
-          displayName: { type: "string" },
-          displayDciNumber: { type: "string", nullable: true },
-          startingElo: { type: "integer" },
-          currentElo: { type: "integer" },
-          endingElo: { type: "integer", nullable: true },
-          active: { type: "boolean" },
-          rank: { type: "integer", nullable: true },
-          matchPoints: { type: "integer" },
-          matchWins: { type: "integer" },
-          matchLosses: { type: "integer" },
-          matchDraws: { type: "integer" },
+          tournamentId: { type: 'string' },
+          tournamentPlayerId: { type: 'string' },
+          name: { type: 'string' },
+          status: { type: 'string' },
+          playedAt: { type: 'string', format: 'date-time' },
+          displayName: { type: 'string' },
+          displayDciNumber: { type: 'string', nullable: true },
+          startingElo: { type: 'integer' },
+          currentElo: { type: 'integer' },
+          endingElo: { type: 'integer', nullable: true },
+          active: { type: 'boolean' },
+          rank: { type: 'integer', nullable: true },
+          matchPoints: { type: 'integer' },
+          matchWins: { type: 'integer' },
+          matchLosses: { type: 'integer' },
+          matchDraws: { type: 'integer' },
         },
         required: [
-          "tournamentId",
-          "tournamentPlayerId",
-          "name",
-          "status",
-          "playedAt",
-          "displayName",
-          "startingElo",
-          "currentElo",
-          "endingElo",
-          "active",
-          "rank",
-          "matchPoints",
-          "matchWins",
-          "matchLosses",
-          "matchDraws",
+          'tournamentId',
+          'tournamentPlayerId',
+          'name',
+          'status',
+          'playedAt',
+          'displayName',
+          'startingElo',
+          'currentElo',
+          'endingElo',
+          'active',
+          'rank',
+          'matchPoints',
+          'matchWins',
+          'matchLosses',
+          'matchDraws',
         ],
       },
       PlayerListItem: {
-        type: "object",
+        type: 'object',
         properties: {
-          id: { type: "string" },
-          name: { type: "string" },
-          normalizedName: { type: "string" },
-          dciNumber: { type: "string", nullable: true },
-          rating: { type: "integer" },
-          createdAt: { type: "string", format: "date-time" },
-          updatedAt: { type: "string", format: "date-time" },
-          stats: { $ref: "#/components/schemas/PlayerStats" },
+          id: { type: 'string' },
+          name: { type: 'string' },
+          normalizedName: { type: 'string' },
+          dciNumber: { type: 'string', nullable: true },
+          rating: { type: 'integer' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+          stats: { $ref: '#/components/schemas/PlayerStats' },
         },
-        required: ["id", "name", "normalizedName", "rating", "createdAt", "updatedAt", "stats"],
+        required: ['id', 'name', 'normalizedName', 'rating', 'createdAt', 'updatedAt', 'stats'],
       },
       PlayerSummary: {
-        type: "object",
+        type: 'object',
         properties: {
-          id: { type: "string" },
-          name: { type: "string" },
-          normalizedName: { type: "string" },
-          dciNumber: { type: "string", nullable: true },
-          rating: { type: "integer" },
-          createdAt: { type: "string", format: "date-time" },
-          updatedAt: { type: "string", format: "date-time" },
-          stats: { $ref: "#/components/schemas/PlayerStats" },
+          id: { type: 'string' },
+          name: { type: 'string' },
+          normalizedName: { type: 'string' },
+          dciNumber: { type: 'string', nullable: true },
+          rating: { type: 'integer' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+          stats: { $ref: '#/components/schemas/PlayerStats' },
           tournaments: {
-            type: "array",
-            items: { $ref: "#/components/schemas/PlayerTournamentHistoryEntry" },
+            type: 'array',
+            items: { $ref: '#/components/schemas/PlayerTournamentHistoryEntry' },
           },
         },
-        required: ["id", "name", "normalizedName", "rating", "createdAt", "updatedAt", "stats", "tournaments"],
+        required: [
+          'id',
+          'name',
+          'normalizedName',
+          'rating',
+          'createdAt',
+          'updatedAt',
+          'stats',
+          'tournaments',
+        ],
       },
       CreateTournamentInput: {
-        type: "object",
+        type: 'object',
         properties: {
-          name: { type: "string" },
-          format: { type: "string" },
-          totalRounds: { type: "integer" },
+          name: { type: 'string' },
+          format: { type: 'string' },
+          totalRounds: { type: 'integer' },
         },
-        required: ["name"],
+        required: ['name'],
       },
       AddPlayerInput: {
-        type: "object",
+        type: 'object',
         properties: {
-          name: { type: "string" },
-          dciNumber: { type: "string" },
-          elo: { type: "integer" },
+          name: { type: 'string' },
+          dciNumber: { type: 'string' },
+          elo: { type: 'integer' },
         },
-        required: ["name"],
+        required: ['name'],
       },
       ReportResultInput: {
-        type: "object",
+        type: 'object',
         properties: {
-          wins1: { type: "integer" },
-          wins2: { type: "integer" },
-          draws: { type: "integer" },
+          wins1: { type: 'integer' },
+          wins2: { type: 'integer' },
+          draws: { type: 'integer' },
         },
-        required: ["wins1", "wins2", "draws"],
+        required: ['wins1', 'wins2', 'draws'],
       },
     },
   },

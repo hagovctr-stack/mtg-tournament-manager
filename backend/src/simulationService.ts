@@ -1,7 +1,11 @@
-import { replayTournamentElo, type EloReplayMatch } from "./eloService";
-import { MAX_TOURNAMENT_PLAYERS, usesDraftPodSeating, type TournamentFormat } from "./tournamentRules";
+import { replayTournamentElo, type EloReplayMatch } from './eloService';
+import {
+  MAX_TOURNAMENT_PLAYERS,
+  usesDraftPodSeating,
+  type TournamentFormat,
+} from './tournamentRules';
 
-export type BestOfFormat = "BO1" | "BO3" | "BO5";
+export type BestOfFormat = 'BO1' | 'BO3' | 'BO5';
 
 export const MIN_SIMULATION_PLAYERS = 6;
 export const MIN_DRAFT_POD_PLAYERS = 6;
@@ -10,11 +14,11 @@ export const MAX_DRAFT_POD_PLAYERS = 12;
 export function getSimulationParticipantRange(format: string, poolSize: number) {
   const maxPlayers = Math.min(
     usesDraftPodSeating(format) ? MAX_DRAFT_POD_PLAYERS : MAX_TOURNAMENT_PLAYERS,
-    poolSize
+    poolSize,
   );
   const minPlayers = Math.min(
     usesDraftPodSeating(format) ? MIN_DRAFT_POD_PLAYERS : MIN_SIMULATION_PLAYERS,
-    maxPlayers
+    maxPlayers,
   );
 
   return {
@@ -122,7 +126,11 @@ export type ActualPlayerRating = {
 export type SimulationRuntime = {
   ensurePool(players: SimulationPoolPlayer[]): Promise<PoolRatingSnapshot[]>;
   getPoolRatings(players: SimulationPoolPlayer[]): Promise<PoolRatingSnapshot[]>;
-  createTournament(input: { name: string; format: TournamentFormat; bestOfFormat: BestOfFormat }): Promise<{ id: string; name: string }>;
+  createTournament(input: {
+    name: string;
+    format: TournamentFormat;
+    bestOfFormat: BestOfFormat;
+  }): Promise<{ id: string; name: string }>;
   addPlayer(tournamentId: string, input: { name: string; dciNumber: string }): Promise<void>;
   startTournament(tournamentId: string): Promise<{ id: string; totalRounds: number }>;
   randomizeSeats(tournamentId: string): Promise<void>;
@@ -172,21 +180,23 @@ export type SimulationSeriesSummary = {
 };
 
 const NAMED_SIMULATION_POOL: SimulationPoolPlayer[] = [
-  { name: "Alice Mercer", dciNumber: "SIM-001" },
-  { name: "Bruno Salvat", dciNumber: "SIM-002" },
-  { name: "Carla Nunez", dciNumber: "SIM-003" },
-  { name: "Diego Paredes", dciNumber: "SIM-004" },
-  { name: "Elena Costa", dciNumber: "SIM-005" },
-  { name: "Federico Paz", dciNumber: "SIM-006" },
-  { name: "Gabriela Soto", dciNumber: "SIM-007" },
-  { name: "Hector Luna", dciNumber: "SIM-008" },
-  { name: "Ines Vidal", dciNumber: "SIM-009" },
-  { name: "Javier Rios", dciNumber: "SIM-010" },
-  { name: "Kiara Mendez", dciNumber: "SIM-011" },
-  { name: "Lucas Ferrer", dciNumber: "SIM-012" },
+  { name: 'Alice Mercer', dciNumber: 'SIM-001' },
+  { name: 'Bruno Salvat', dciNumber: 'SIM-002' },
+  { name: 'Carla Nunez', dciNumber: 'SIM-003' },
+  { name: 'Diego Paredes', dciNumber: 'SIM-004' },
+  { name: 'Elena Costa', dciNumber: 'SIM-005' },
+  { name: 'Federico Paz', dciNumber: 'SIM-006' },
+  { name: 'Gabriela Soto', dciNumber: 'SIM-007' },
+  { name: 'Hector Luna', dciNumber: 'SIM-008' },
+  { name: 'Ines Vidal', dciNumber: 'SIM-009' },
+  { name: 'Javier Rios', dciNumber: 'SIM-010' },
+  { name: 'Kiara Mendez', dciNumber: 'SIM-011' },
+  { name: 'Lucas Ferrer', dciNumber: 'SIM-012' },
 ];
 
-export function buildSimulationPlayerPool(totalPlayers = MAX_TOURNAMENT_PLAYERS): SimulationPoolPlayer[] {
+export function buildSimulationPlayerPool(
+  totalPlayers = MAX_TOURNAMENT_PLAYERS,
+): SimulationPoolPlayer[] {
   if (totalPlayers <= NAMED_SIMULATION_POOL.length) {
     return NAMED_SIMULATION_POOL.slice(0, totalPlayers);
   }
@@ -195,12 +205,12 @@ export function buildSimulationPlayerPool(totalPlayers = MAX_TOURNAMENT_PLAYERS)
     { length: totalPlayers - NAMED_SIMULATION_POOL.length },
     (_, index) => {
       const playerNumber = NAMED_SIMULATION_POOL.length + index + 1;
-      const suffix = String(playerNumber).padStart(3, "0");
+      const suffix = String(playerNumber).padStart(3, '0');
       return {
         name: `Simulation Player ${suffix}`,
         dciNumber: `SIM-${suffix}`,
       };
-    }
+    },
   );
 
   return [...NAMED_SIMULATION_POOL, ...generatedPlayers];
@@ -208,19 +218,19 @@ export function buildSimulationPlayerPool(totalPlayers = MAX_TOURNAMENT_PLAYERS)
 
 export const SIMULATION_PLAYER_POOL: SimulationPoolPlayer[] = buildSimulationPlayerPool();
 
-const BEST_OF_FORMAT_OPTIONS: readonly BestOfFormat[] = ["BO1", "BO3", "BO5"] as const;
+const BEST_OF_FORMAT_OPTIONS: readonly BestOfFormat[] = ['BO1', 'BO3', 'BO5'] as const;
 
 const TOURNAMENT_FORMAT_OPTIONS: readonly TournamentFormat[] = [
-  "Draft",
-  "Sealed",
-  "Cube",
-  "Standard",
-  "Pioneer",
-  "Modern",
-  "Legacy",
-  "Vintage",
-  "Pauper",
-  "Commander",
+  'Draft',
+  'Sealed',
+  'Cube',
+  'Standard',
+  'Pioneer',
+  'Modern',
+  'Legacy',
+  'Vintage',
+  'Pauper',
+  'Commander',
 ] as const;
 
 type WeightedResultOption = SimulationResultInput & {
@@ -230,34 +240,34 @@ type WeightedResultOption = SimulationResultInput & {
 
 const RESULT_OPTIONS: Record<BestOfFormat, WeightedResultOption[]> = {
   BO1: [
-    { wins1: 1, wins2: 0, draws: 0, label: "1-0", weight: 0.5 },
-    { wins1: 0, wins2: 1, draws: 0, label: "0-1", weight: 0.5 },
+    { wins1: 1, wins2: 0, draws: 0, label: '1-0', weight: 0.5 },
+    { wins1: 0, wins2: 1, draws: 0, label: '0-1', weight: 0.5 },
   ],
   BO3: [
-    { wins1: 2, wins2: 0, draws: 0, label: "2-0", weight: 0.225 },
-    { wins1: 2, wins2: 1, draws: 0, label: "2-1", weight: 0.225 },
-    { wins1: 1, wins2: 2, draws: 0, label: "1-2", weight: 0.225 },
-    { wins1: 0, wins2: 2, draws: 0, label: "0-2", weight: 0.225 },
-    { wins1: 1, wins2: 1, draws: 0, label: "1-1 draw", weight: 0.1 },
+    { wins1: 2, wins2: 0, draws: 0, label: '2-0', weight: 0.225 },
+    { wins1: 2, wins2: 1, draws: 0, label: '2-1', weight: 0.225 },
+    { wins1: 1, wins2: 2, draws: 0, label: '1-2', weight: 0.225 },
+    { wins1: 0, wins2: 2, draws: 0, label: '0-2', weight: 0.225 },
+    { wins1: 1, wins2: 1, draws: 0, label: '1-1 draw', weight: 0.1 },
   ],
   BO5: [
-    { wins1: 3, wins2: 0, draws: 0, label: "3-0", weight: 0.1566666667 },
-    { wins1: 3, wins2: 1, draws: 0, label: "3-1", weight: 0.1566666667 },
-    { wins1: 3, wins2: 2, draws: 0, label: "3-2", weight: 0.1566666667 },
-    { wins1: 2, wins2: 3, draws: 0, label: "2-3", weight: 0.1566666667 },
-    { wins1: 1, wins2: 3, draws: 0, label: "1-3", weight: 0.1566666667 },
-    { wins1: 0, wins2: 3, draws: 0, label: "0-3", weight: 0.1566666667 },
-    { wins1: 2, wins2: 2, draws: 0, label: "2-2 draw", weight: 0.06 },
+    { wins1: 3, wins2: 0, draws: 0, label: '3-0', weight: 0.1566666667 },
+    { wins1: 3, wins2: 1, draws: 0, label: '3-1', weight: 0.1566666667 },
+    { wins1: 3, wins2: 2, draws: 0, label: '3-2', weight: 0.1566666667 },
+    { wins1: 2, wins2: 3, draws: 0, label: '2-3', weight: 0.1566666667 },
+    { wins1: 1, wins2: 3, draws: 0, label: '1-3', weight: 0.1566666667 },
+    { wins1: 0, wins2: 3, draws: 0, label: '0-3', weight: 0.1566666667 },
+    { wins1: 2, wins2: 2, draws: 0, label: '2-2 draw', weight: 0.06 },
   ],
 };
 
 function normalizeName(name: string) {
-  return name.trim().replace(/\s+/g, " ").toLowerCase();
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 async function resolveDb(db?: any) {
   if (db) return db;
-  const { prisma } = await import("./db");
+  const { prisma } = await import('./db');
   return prisma;
 }
 
@@ -303,10 +313,12 @@ export function pickTournamentParticipants(
   pool: SimulationPoolPlayer[],
   rng: () => number,
   format: TournamentFormat,
-  forceFullCapacity = false
+  forceFullCapacity = false,
 ) {
   const { minPlayers, maxPlayers } = getSimulationParticipantRange(format, pool.length);
-  const participantCount = forceFullCapacity ? maxPlayers : randomIntInclusive(rng, minPlayers, maxPlayers);
+  const participantCount = forceFullCapacity
+    ? maxPlayers
+    : randomIntInclusive(rng, minPlayers, maxPlayers);
   return shuffleWithRng(pool, rng).slice(0, participantCount);
 }
 
@@ -323,7 +335,9 @@ export function usesDraftPodSimulationSeating(format: TournamentFormat) {
 }
 
 function pickNonDraftPodFormat(rng: () => number): TournamentFormat {
-  const eligibleFormats = TOURNAMENT_FORMAT_OPTIONS.filter((format) => !usesDraftPodSimulationSeating(format));
+  const eligibleFormats = TOURNAMENT_FORMAT_OPTIONS.filter(
+    (format) => !usesDraftPodSimulationSeating(format),
+  );
   return eligibleFormats[Math.floor(rng() * eligibleFormats.length)]!;
 }
 
@@ -337,7 +351,10 @@ function pickWeightedOption<T extends { weight: number }>(options: T[], rng: () 
   return options[options.length - 1]!;
 }
 
-export function generateRandomResult(format: BestOfFormat, rng: () => number): SimulationResultInput {
+export function generateRandomResult(
+  format: BestOfFormat,
+  rng: () => number,
+): SimulationResultInput {
   const option = pickWeightedOption(RESULT_OPTIONS[format], rng);
   return { wins1: option.wins1, wins2: option.wins2, draws: option.draws };
 }
@@ -350,15 +367,13 @@ export function describeResult(input: SimulationResultInput) {
 export function isValidRandomResult(format: BestOfFormat, input: SimulationResultInput) {
   return RESULT_OPTIONS[format].some(
     (option) =>
-      option.wins1 === input.wins1 &&
-      option.wins2 === input.wins2 &&
-      option.draws === input.draws
+      option.wins1 === input.wins1 && option.wins2 === input.wins2 && option.draws === input.draws,
   );
 }
 
 export function validatePersistedTournamentRatings(
   finishedTournaments: PersistedTournamentHistory[],
-  actualPlayers: ActualPlayerRating[]
+  actualPlayers: ActualPlayerRating[],
 ): RatingValidationResult {
   const expectedRatings = new Map<string, number>();
   const actualRatings = new Map(actualPlayers.map((player) => [player.playerId, player.rating]));
@@ -369,7 +384,8 @@ export function validatePersistedTournamentRatings(
 
   const orderedTournaments = [...finishedTournaments].sort(
     (left, right) =>
-      left.createdAt.localeCompare(right.createdAt) || left.tournamentId.localeCompare(right.tournamentId)
+      left.createdAt.localeCompare(right.createdAt) ||
+      left.tournamentId.localeCompare(right.tournamentId),
   );
 
   for (const tournament of orderedTournaments) {
@@ -378,11 +394,12 @@ export function validatePersistedTournamentRatings(
         id: registration.tournamentPlayerId,
         startingElo: registration.startingElo,
       })),
-      tournament.matches
+      tournament.matches,
     );
 
     for (const registration of tournament.registrations) {
-      const replayedCurrent = replayedRatings.get(registration.tournamentPlayerId) ?? registration.startingElo;
+      const replayedCurrent =
+        replayedRatings.get(registration.tournamentPlayerId) ?? registration.startingElo;
 
       if (registration.currentElo !== replayedCurrent) {
         currentEloMismatches.push({
@@ -442,29 +459,29 @@ export function validatePersistedTournamentRatings(
 }
 
 export function buildValidationFailureMessage(result: RatingValidationResult) {
-  if (result.ok) return "validation ok";
+  if (result.ok) return 'validation ok';
 
   const lines: string[] = [];
 
   for (const mismatch of result.playerRatingMismatches) {
     lines.push(
-      `player rating mismatch: ${mismatch.playerName} expected ${mismatch.expected}, actual ${mismatch.actual}`
+      `player rating mismatch: ${mismatch.playerName} expected ${mismatch.expected}, actual ${mismatch.actual}`,
     );
   }
 
   for (const mismatch of result.currentEloMismatches) {
     lines.push(
-      `tournament currentElo mismatch: ${mismatch.tournamentName} / ${mismatch.playerName} expected ${mismatch.expected}, actual ${mismatch.actual}`
+      `tournament currentElo mismatch: ${mismatch.tournamentName} / ${mismatch.playerName} expected ${mismatch.expected}, actual ${mismatch.actual}`,
     );
   }
 
   for (const mismatch of result.startingEloMismatches) {
     lines.push(
-      `startingElo continuity mismatch: ${mismatch.tournamentName} / ${mismatch.playerName} expected ${mismatch.expectedStartingElo}, actual ${mismatch.actualStartingElo}`
+      `startingElo continuity mismatch: ${mismatch.tournamentName} / ${mismatch.playerName} expected ${mismatch.expectedStartingElo}, actual ${mismatch.actualStartingElo}`,
     );
   }
 
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 export async function validatePersistedPlayerRatings(playerIds: string[], db?: any) {
@@ -477,14 +494,14 @@ export async function validatePersistedPlayerRatings(playerIds: string[], db?: a
 
   const tournaments = await client.tournament.findMany({
     where: {
-      status: "FINISHED",
+      status: 'FINISHED',
       players: {
         some: {
           playerId: { in: playerIds },
         },
       },
     },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     include: {
       players: {
         select: {
@@ -496,10 +513,10 @@ export async function validatePersistedPlayerRatings(playerIds: string[], db?: a
         },
       },
       rounds: {
-        orderBy: { number: "asc" },
+        orderBy: { number: 'asc' },
         include: {
           matches: {
-            orderBy: { tableNumber: "asc" },
+            orderBy: { tableNumber: 'asc' },
             select: {
               tableNumber: true,
               player1TournamentPlayerId: true,
@@ -530,7 +547,7 @@ export async function validatePersistedPlayerRatings(playerIds: string[], db?: a
         player1Id: match.player1TournamentPlayerId,
         player2Id: match.player2TournamentPlayerId,
         result: match.result,
-      }))
+      })),
     ),
   }));
 
@@ -540,16 +557,18 @@ export async function validatePersistedPlayerRatings(playerIds: string[], db?: a
       playerId: player.id,
       name: player.name,
       rating: player.rating,
-    }))
+    })),
   );
 }
 
 export async function createRealSimulationRuntime(db?: any): Promise<SimulationRuntime> {
   const client = await resolveDb(db);
-  const standingsService = await import("./standingsService");
-  const tournamentService = await import("./tournamentService");
+  const standingsService = await import('./standingsService');
+  const tournamentService = await import('./tournamentService');
 
-  const fetchPoolRatings = async (players: SimulationPoolPlayer[]): Promise<PoolRatingSnapshot[]> => {
+  const fetchPoolRatings = async (
+    players: SimulationPoolPlayer[],
+  ): Promise<PoolRatingSnapshot[]> => {
     const records = await client.player.findMany({
       where: {
         dciNumber: {
@@ -559,10 +578,13 @@ export async function createRealSimulationRuntime(db?: any): Promise<SimulationR
       select: { id: true, name: true, dciNumber: true, rating: true },
     });
 
-    const byDciNumber = new Map<string, { id: string; name: string; dciNumber: string | null; rating: number }>(
+    const byDciNumber = new Map<
+      string,
+      { id: string; name: string; dciNumber: string | null; rating: number }
+    >(
       records
         .filter((record: any) => record.dciNumber)
-        .map((record: any) => [record.dciNumber as string, record])
+        .map((record: any) => [record.dciNumber as string, record]),
     );
 
     return players.map((player) => {
@@ -592,8 +614,8 @@ export async function createRealSimulationRuntime(db?: any): Promise<SimulationR
               dciNumber: player.dciNumber,
               rating: 1500,
             },
-          })
-        )
+          }),
+        ),
       );
 
       return fetchPoolRatings(players);
@@ -651,7 +673,11 @@ function formatDelta(delta: number) {
   return delta >= 0 ? `+${delta}` : `${delta}`;
 }
 
-function logRatingsTable(log: (line: string) => void, title: string, ratings: PoolRatingSnapshot[]) {
+function logRatingsTable(
+  log: (line: string) => void,
+  title: string,
+  ratings: PoolRatingSnapshot[],
+) {
   log(title);
   for (const rating of ratings) {
     log(`  ${rating.name.padEnd(16)} ${String(rating.rating).padStart(4)}`);
@@ -668,23 +694,25 @@ export type RunSeededTournamentSimulationOptions = {
 };
 
 export async function runSeededTournamentSimulation(
-  options: RunSeededTournamentSimulationOptions
+  options: RunSeededTournamentSimulationOptions,
 ): Promise<SimulationSeriesSummary> {
-  const seed = options.seed ?? "mtg-sim";
+  const seed = options.seed ?? 'mtg-sim';
   const tournamentCount = options.tournamentCount ?? 10;
   const pool = options.pool ?? SIMULATION_PLAYER_POOL;
   const log = options.log ?? (() => undefined);
   const rng = createSeededRandom(seed);
   const ensuredPool = await options.runtime.ensurePool(pool);
-  const playerIds = ensuredPool.map((player) => player.playerId).filter((playerId): playerId is string => Boolean(playerId));
+  const playerIds = ensuredPool
+    .map((player) => player.playerId)
+    .filter((playerId): playerId is string => Boolean(playerId));
 
   if (playerIds.length !== pool.length) {
-    throw new Error("Simulation pool did not resolve to persistent player ids");
+    throw new Error('Simulation pool did not resolve to persistent player ids');
   }
 
   log(`Simulation seed: ${seed}`);
   log(`Pool size: ${pool.length}`);
-  log("");
+  log('');
 
   const tournaments: TournamentSimulationSummary[] = [];
 
@@ -693,12 +721,13 @@ export async function runSeededTournamentSimulation(
     const beforeByDci = new Map(beforeRatings.map((rating) => [rating.dciNumber, rating.rating]));
     const forceFullCapacity = tournamentIndex === tournamentCount;
     const initialFormat = pickTournamentFormat(rng);
-    const format = forceFullCapacity && usesDraftPodSimulationSeating(initialFormat)
-      ? pickNonDraftPodFormat(rng)
-      : initialFormat;
+    const format =
+      forceFullCapacity && usesDraftPodSimulationSeating(initialFormat)
+        ? pickNonDraftPodFormat(rng)
+        : initialFormat;
     const participants = pickTournamentParticipants(pool, rng, format, forceFullCapacity);
     const bestOfFormat = pickBestOfFormat(rng);
-    const tournamentName = `${options.namePrefix ?? "Simulation"} ${seed} #${tournamentIndex}`;
+    const tournamentName = `${options.namePrefix ?? 'Simulation'} ${seed} #${tournamentIndex}`;
 
     const tournament = await options.runtime.createTournament({
       name: tournamentName,
@@ -723,14 +752,14 @@ export async function runSeededTournamentSimulation(
       const round = await options.runtime.generateRound(tournament.id);
       if (!round) break;
 
-      const matchSummaries: TournamentRoundSummary["matches"] = [];
+      const matchSummaries: TournamentRoundSummary['matches'] = [];
       for (const match of round.matches) {
-        if (match.result === "BYE" || !match.player2) {
+        if (match.result === 'BYE' || !match.player2) {
           matchSummaries.push({
             tableNumber: match.tableNumber,
             player1: match.player1.name,
             player2: match.player2?.name ?? null,
-            result: "BYE",
+            result: 'BYE',
           });
           continue;
         }
@@ -783,50 +812,52 @@ export async function runSeededTournamentSimulation(
 
     log(`Tournament ${tournamentIndex}: ${tournamentName}`);
     log(`Format: ${format} · ${bestOfFormat}`);
-    log(`Participants: ${participants.length}${forceFullCapacity ? " (full room)" : ""}`);
-    logRatingsTable(log, "Global ratings before:", beforeRatings);
-    log("Roster ELO delta:");
+    log(`Participants: ${participants.length}${forceFullCapacity ? ' (full room)' : ''}`);
+    logRatingsTable(log, 'Global ratings before:', beforeRatings);
+    log('Roster ELO delta:');
     for (const participant of participantSummaries) {
       log(
         `  ${participant.name.padEnd(16)} ${String(participant.startRating).padStart(4)} -> ${String(
-          participant.endRating
-        ).padStart(4)} (${formatDelta(participant.delta)})`
+          participant.endRating,
+        ).padStart(4)} (${formatDelta(participant.delta)})`,
       );
     }
-    log("Round results:");
+    log('Round results:');
     for (const round of rounds) {
       log(`  Round ${round.number}`);
       for (const match of round.matches) {
-        const pairing = match.player2 ? `${match.player1} vs ${match.player2}` : `${match.player1} BYE`;
+        const pairing = match.player2
+          ? `${match.player1} vs ${match.player2}`
+          : `${match.player1} BYE`;
         log(`    Table ${match.tableNumber}: ${pairing} -> ${match.result}`);
       }
     }
-    log("Standings:");
+    log('Standings:');
     for (const standing of standings) {
       log(
-        `  ${standing.rank}. ${standing.player.name.padEnd(16)} ${String(standing.matchPoints).padStart(2)} pts ELO ${standing.player.elo}`
+        `  ${standing.rank}. ${standing.player.name.padEnd(16)} ${String(standing.matchPoints).padStart(2)} pts ELO ${standing.player.elo}`,
       );
     }
-    logRatingsTable(log, "Global ratings after:", afterRatings);
-    log(`Validation: ${validation.ok ? "OK" : "FAILED"}`);
+    logRatingsTable(log, 'Global ratings after:', afterRatings);
+    log(`Validation: ${validation.ok ? 'OK' : 'FAILED'}`);
     if (!validation.ok) {
       log(buildValidationFailureMessage(validation));
       throw new Error(`Simulation validation failed after ${tournamentName}`);
     }
-    log("");
+    log('');
   }
 
   const finalRatings = await options.runtime.getPoolRatings(pool);
   const finalValidation = await options.runtime.validatePoolRatings(playerIds);
 
-  log("Final rating table:");
+  log('Final rating table:');
   for (const rating of finalRatings) {
     log(`  ${rating.name.padEnd(16)} ${String(rating.rating).padStart(4)}`);
   }
-  log(`Final validation: ${finalValidation.ok ? "OK" : "FAILED"}`);
+  log(`Final validation: ${finalValidation.ok ? 'OK' : 'FAILED'}`);
   if (!finalValidation.ok) {
     log(buildValidationFailureMessage(finalValidation));
-    throw new Error("Simulation validation failed at final replay check");
+    throw new Error('Simulation validation failed at final replay check');
   }
 
   return {

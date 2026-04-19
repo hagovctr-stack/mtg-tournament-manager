@@ -1,17 +1,17 @@
-import express from "express";
-import path from "path";
-import { createServer } from "http";
-import cors from "cors";
-import helmet from "helmet";
-import { initWebSocket } from "./websocket";
-import router from "./routes";
-import { openApiDocument } from "./openapi";
+import express from 'express';
+import path from 'path';
+import { createServer } from 'http';
+import cors from 'cors';
+import helmet from 'helmet';
+import { initWebSocket } from './websocket';
+import router from './routes';
+import { openApiDocument } from './openapi';
 
 const app = express();
 const httpServer = createServer(app);
 
-app.get("/docs", (_req, res) => {
-  res.type("html").send(`<!DOCTYPE html>
+app.get('/docs', (_req, res) => {
+  res.type('html').send(`<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -42,21 +42,23 @@ app.get("/docs", (_req, res) => {
 });
 
 app.use(helmet());
-app.use(cors({
-  origin: process.env.FRONTEND_URL ?? "http://localhost:5173",
-  methods: ["GET", "POST", "PATCH", "DELETE"],
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    credentials: true,
+  }),
+);
 app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 initWebSocket(httpServer);
 
-app.get("/openapi.json", (_req, res) => res.json(openApiDocument));
-app.use("/api", router);
-app.get("/health", (_req, res) => res.json({ ok: true }));
+app.get('/openapi.json', (_req, res) => res.json(openApiDocument));
+app.use('/api', router);
+app.get('/health', (_req, res) => res.json({ ok: true }));
 
-const PORT = parseInt(process.env.PORT ?? "3001", 10);
+const PORT = parseInt(process.env.PORT ?? '3001', 10);
 httpServer.listen(PORT, () => {
   console.log(`[server] Running on http://localhost:${PORT}`);
 });

@@ -1,5 +1,5 @@
-import { SIMULATION_PLAYER_POOL } from "../src/simulationService";
-import { createTournament, addPlayer } from "../src/tournamentService";
+import { SIMULATION_PLAYER_POOL } from '../src/simulationService';
+import { createTournament, addPlayer } from '../src/tournamentService';
 
 function parseArgs(argv: string[]) {
   let playerCount = 8;
@@ -7,24 +7,24 @@ function parseArgs(argv: string[]) {
 
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index]!;
-    if (value === "--players") {
-      const parsed = Number.parseInt(argv[index + 1] ?? "", 10);
+    if (value === '--players') {
+      const parsed = Number.parseInt(argv[index + 1] ?? '', 10);
       if (!Number.isNaN(parsed)) playerCount = parsed;
       index += 1;
       continue;
     }
-    if (value.startsWith("--players=")) {
-      const parsed = Number.parseInt(value.slice("--players=".length), 10);
+    if (value.startsWith('--players=')) {
+      const parsed = Number.parseInt(value.slice('--players='.length), 10);
       if (!Number.isNaN(parsed)) playerCount = parsed;
       continue;
     }
-    if (value === "--name") {
+    if (value === '--name') {
       name = argv[index + 1] ?? null;
       index += 1;
       continue;
     }
-    if (value.startsWith("--name=")) {
-      name = value.slice("--name=".length) || null;
+    if (value.startsWith('--name=')) {
+      name = value.slice('--name='.length) || null;
     }
   }
 
@@ -34,7 +34,7 @@ function parseArgs(argv: string[]) {
 
 function buildDefaultName() {
   const now = new Date();
-  const stamp = now.toISOString().replace("T", " ").slice(0, 16);
+  const stamp = now.toISOString().replace('T', ' ').slice(0, 16);
   return `Smoke Draft Pod ${stamp}`;
 }
 
@@ -44,9 +44,9 @@ async function main() {
 
   const tournament = await createTournament({
     name: name?.trim() || buildDefaultName(),
-    format: "Cube",
-    subtitle: "Smoke validation",
-    bestOfFormat: "BO3",
+    format: 'Cube',
+    subtitle: 'Smoke validation',
+    bestOfFormat: 'BO3',
   });
 
   for (const player of selectedPlayers) {
@@ -68,6 +68,6 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    const { prisma } = await import("../src/db");
+    const { prisma } = await import('../src/db');
     await prisma.$disconnect();
   });

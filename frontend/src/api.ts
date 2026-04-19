@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3001/api";
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api';
 
 class ApiError extends Error {
   code?: string;
@@ -11,53 +11,63 @@ class ApiError extends Error {
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new ApiError(err.error ?? "Request failed", err.code);
+    throw new ApiError(err.error ?? 'Request failed', err.code);
   }
   return res.json();
 }
 
 export const api = {
-  listTournaments: () => request<Tournament[]>("GET", "/tournaments"),
-  listPlayers: () => request<PlayerListItem[]>("GET", "/players"),
+  listTournaments: () => request<Tournament[]>('GET', '/tournaments'),
+  listPlayers: () => request<PlayerListItem[]>('GET', '/players'),
   createPlayer: (data: AddPlayerInput, force = false) =>
-    request<PlayerListItem>("POST", `/players${force ? "?force=true" : ""}`, data),
-  createTournament: (data: CreateTournamentInput) => request<Tournament>("POST", "/tournaments", data),
-  getTournament: (id: string) => request<TournamentDetail>("GET", `/tournaments/${id}`),
-  startTournament: (id: string) => request<Tournament>("POST", `/tournaments/${id}/start`),
-  finishTournament: (id: string) => request<Tournament>("POST", `/tournaments/${id}/finish`),
-  deleteTournament: (id: string) => request<{ id: string; name: string }>("DELETE", `/tournaments/${id}`),
+    request<PlayerListItem>('POST', `/players${force ? '?force=true' : ''}`, data),
+  createTournament: (data: CreateTournamentInput) =>
+    request<Tournament>('POST', '/tournaments', data),
+  getTournament: (id: string) => request<TournamentDetail>('GET', `/tournaments/${id}`),
+  startTournament: (id: string) => request<Tournament>('POST', `/tournaments/${id}/start`),
+  finishTournament: (id: string) => request<Tournament>('POST', `/tournaments/${id}/finish`),
+  deleteTournament: (id: string) =>
+    request<{ id: string; name: string }>('DELETE', `/tournaments/${id}`),
   addPlayer: (tournamentId: string, data: AddPlayerInput) =>
-    request<Player>("POST", `/tournaments/${tournamentId}/players`, data),
-  dropPlayer: (playerId: string) => request<Player>("DELETE", `/players/${playerId}`),
-  deletePlayer: (playerId: string) => request<{ id: string }>("DELETE", `/players/${playerId}/profile`),
+    request<Player>('POST', `/tournaments/${tournamentId}/players`, data),
+  dropPlayer: (playerId: string) => request<Player>('DELETE', `/players/${playerId}`),
+  deletePlayer: (playerId: string) =>
+    request<{ id: string }>('DELETE', `/players/${playerId}/profile`),
   uploadPlayerAvatar: (playerId: string, file: File) => {
     const form = new FormData();
-    form.append("avatar", file);
-    return fetch(`${BASE_URL}/players/${playerId}/avatar`, { method: "POST", body: form })
-      .then(async (res) => {
+    form.append('avatar', file);
+    return fetch(`${BASE_URL}/players/${playerId}/avatar`, { method: 'POST', body: form }).then(
+      async (res) => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: res.statusText }));
-          throw new ApiError(err.error ?? "Upload failed", err.code);
+          throw new ApiError(err.error ?? 'Upload failed', err.code);
         }
         return res.json() as Promise<PlayerListItem>;
-      });
+      },
+    );
   },
-  getPlayerSummary: (playerId: string) => request<PlayerSummary>("GET", `/players/${playerId}/summary`),
-  generateRound: (tournamentId: string) => request<Round>("POST", `/tournaments/${tournamentId}/rounds`),
+  getPlayerSummary: (playerId: string) =>
+    request<PlayerSummary>('GET', `/players/${playerId}/summary`),
+  generateRound: (tournamentId: string) =>
+    request<Round>('POST', `/tournaments/${tournamentId}/rounds`),
   reportResult: (matchId: string, data: ReportResultInput) =>
-    request<Match>("PATCH", `/matches/${matchId}/result`, data),
+    request<Match>('PATCH', `/matches/${matchId}/result`, data),
   getStandings: (tournamentId: string, round?: number) =>
-    request<Standing[]>("GET", `/tournaments/${tournamentId}/standings${round !== undefined ? `?round=${round}` : ""}`),
+    request<Standing[]>(
+      'GET',
+      `/tournaments/${tournamentId}/standings${round !== undefined ? `?round=${round}` : ''}`,
+    ),
   updateTournament: (id: string, data: UpdateTournamentInput) =>
-    request<Tournament>("PATCH", `/tournaments/${id}`, data),
-  randomizeSeats: (id: string) => request<TournamentDetail>("POST", `/tournaments/${id}/randomize-seats`),
+    request<Tournament>('PATCH', `/tournaments/${id}`, data),
+  randomizeSeats: (id: string) =>
+    request<TournamentDetail>('POST', `/tournaments/${id}/randomize-seats`),
   exportCSV: (tournamentId: string) => {
-    window.open(`${BASE_URL}/tournaments/${tournamentId}/export`, "_blank");
+    window.open(`${BASE_URL}/tournaments/${tournamentId}/export`, '_blank');
   },
 };
 
@@ -80,7 +90,7 @@ export interface PlayerTournamentHistoryEntry {
   tournamentId: string;
   tournamentPlayerId: string;
   name: string;
-  status: "REGISTRATION" | "ACTIVE" | "FINISHED";
+  status: 'REGISTRATION' | 'ACTIVE' | 'FINISHED';
   playedAt: string;
   displayName: string;
   displayDciNumber: string | null;
@@ -102,7 +112,7 @@ export interface Tournament {
   subtitle: string;
   cubeCobraUrl: string | null;
   bestOfFormat: string;
-  status: "REGISTRATION" | "ACTIVE" | "FINISHED";
+  status: 'REGISTRATION' | 'ACTIVE' | 'FINISHED';
   totalRounds: number;
   currentRound: number;
   createdAt: string;
@@ -143,7 +153,7 @@ export interface PlayerListItem {
 export interface Round {
   id: string;
   number: number;
-  status: "PENDING" | "ACTIVE" | "FINISHED";
+  status: 'PENDING' | 'ACTIVE' | 'FINISHED';
   startedAt?: string;
   matches: Match[];
 }
@@ -160,7 +170,7 @@ export interface Match {
   wins1: number | null;
   wins2: number | null;
   draws: number | null;
-  result: "PENDING" | "P1_WIN" | "P2_WIN" | "DRAW" | "BYE";
+  result: 'PENDING' | 'P1_WIN' | 'P2_WIN' | 'DRAW' | 'BYE';
   tournamentId: string;
 }
 
