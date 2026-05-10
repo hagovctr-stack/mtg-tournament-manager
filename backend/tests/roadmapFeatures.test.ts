@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeLeagueWindow } from '../src/leagueService';
+import { buildAlternatingTeams } from '../src/teamService';
 import { canEditTournamentResults, validateTournamentPlanUpdate } from '../src/tournamentService';
-
 
 describe('validateTournamentPlanUpdate', () => {
   it('allows increasing the total rounds while a tournament is active', () => {
@@ -42,6 +42,48 @@ describe('normalizeLeagueWindow', () => {
   });
 });
 
+describe('buildAlternatingTeams', () => {
+  it('splits a 6-player pod into alternating teams of three', () => {
+    const teams = buildAlternatingTeams([
+      { tournamentPlayerId: 'p1', seatNumber: 1, name: 'P1' },
+      { tournamentPlayerId: 'p2', seatNumber: 2, name: 'P2' },
+      { tournamentPlayerId: 'p3', seatNumber: 3, name: 'P3' },
+      { tournamentPlayerId: 'p4', seatNumber: 4, name: 'P4' },
+      { tournamentPlayerId: 'p5', seatNumber: 5, name: 'P5' },
+      { tournamentPlayerId: 'p6', seatNumber: 6, name: 'P6' },
+    ]);
+
+    expect(teams).toEqual([
+      {
+        seed: 1,
+        name: 'Team A',
+        members: [
+          { tournamentPlayerId: 'p1', seatOrder: 1 },
+          { tournamentPlayerId: 'p3', seatOrder: 2 },
+          { tournamentPlayerId: 'p5', seatOrder: 3 },
+        ],
+      },
+      {
+        seed: 2,
+        name: 'Team B',
+        members: [
+          { tournamentPlayerId: 'p2', seatOrder: 1 },
+          { tournamentPlayerId: 'p4', seatOrder: 2 },
+          { tournamentPlayerId: 'p6', seatOrder: 3 },
+        ],
+      },
+    ]);
+  });
+
+  it('rejects pods that are not exactly 6 seated players', () => {
+    expect(() =>
+      buildAlternatingTeams([
+        { tournamentPlayerId: 'p1', seatNumber: 1, name: 'P1' },
+        { tournamentPlayerId: 'p2', seatNumber: 2, name: 'P2' },
+      ]),
+    ).toThrow(/exactly 6 seated players/);
+  });
+});
 
 describe('canEditTournamentResults', () => {
   it('allows corrections while a tournament is active or finished', () => {

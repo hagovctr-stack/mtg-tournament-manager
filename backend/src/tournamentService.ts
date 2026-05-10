@@ -46,20 +46,6 @@ function buildScopedListWhere(auth?: AuthContext) {
 const VALID_BEST_OF_FORMATS = ['BO1', 'BO3', 'BO5', 'FREE'] as const;
 type BestOfFormat = (typeof VALID_BEST_OF_FORMATS)[number];
 
-function validateTeamMode(format: string, teamMode?: string, playerCount?: number) {
-  if (!usesTeamDraftMode(teamMode ?? 'NONE')) return;
-  if (!['Draft', 'Cube'].includes(format)) {
-    throw new Error('Team draft mode is only available for Draft and Cube');
-  }
-  if (playerCount !== undefined && playerCount !== 6) {
-    throw new Error('Team draft mode requires exactly 6 active players');
-  }
-}
-
-function normalizeTeamSetupTiming(teamSetupTiming?: string) {
-  return teamSetupTiming === 'AFTER_DRAFT' ? 'AFTER_DRAFT' : 'BEFORE_DRAFT';
-}
-
 export function validateTournamentPlanUpdate(
   tournament: { status: string; totalRounds: number; currentRound: number },
   existingRoundCount: number,
@@ -80,6 +66,20 @@ export function validateTournamentPlanUpdate(
 
 export function canEditTournamentResults(status: string) {
   return status === 'ACTIVE' || status === 'FINISHED';
+}
+
+function validateTeamMode(format: string, teamMode?: string, playerCount?: number) {
+  if (!usesTeamDraftMode(teamMode ?? 'NONE')) return;
+  if (!['Draft', 'Cube'].includes(format)) {
+    throw new Error('Team draft mode is only available for Draft and Cube');
+  }
+  if (playerCount !== undefined && playerCount !== 6) {
+    throw new Error('Team draft mode requires exactly 6 active players');
+  }
+}
+
+function normalizeTeamSetupTiming(teamSetupTiming?: string) {
+  return teamSetupTiming === 'AFTER_DRAFT' ? 'AFTER_DRAFT' : 'BEFORE_DRAFT';
 }
 
 function validateResult(wins1: number, wins2: number, format: BestOfFormat): void {
@@ -119,18 +119,16 @@ export async function createTournament(
   if (!VALID_BEST_OF_FORMATS.includes(bestOfFormat as BestOfFormat)) {
     throw new Error(`Invalid bestOfFormat. Must be one of: ${VALID_BEST_OF_FORMATS.join(', ')}`);
   }
-  const format = data.format ?? 'Cube';
-  const teamMode = data.teamMode === 'TEAM_DRAFT_3V3' ? 'TEAM_DRAFT_3V3' : 'NONE';
-  validateTeamMode(format, teamMode);
+  validateTeamMode(data.format ?? 'Cube', data.teamMode);
   return prisma.tournament.create({
     data: {
       name: data.name,
-      format,
+      format: data.format ?? 'Cube',
       subtitle: data.subtitle ?? '',
       cubeCobraUrl: data.cubeCobraUrl ?? null,
       bestOfFormat,
       totalRounds: data.totalRounds ?? 0,
-      teamMode,
+      teamMode: data.teamMode === 'TEAM_DRAFT_3V3' ? 'TEAM_DRAFT_3V3' : 'NONE',
       teamSetupTiming: normalizeTeamSetupTiming(data.teamSetupTiming),
       leagueId: data.leagueId ?? null,
       organizationId: auth?.organizationId ?? null,
@@ -158,12 +156,18 @@ export async function getTournament(id: string, auth?: AuthContext) {
         orderBy: { number: 'asc' },
         include: {
           matches: {
-            include: { player1: true, player2: true },
+            include: {
+              player1: { include: { player: { select: { avatarUrl: true } } } },
+              player2: { include: { player: { select: { avatarUrl: true } } } },
+            },
             orderBy: { tableNumber: 'asc' },
           },
         },
       },
-      standings: { include: { tournamentPlayer: true }, orderBy: { rank: 'asc' } },
+      standings: {
+        include: { tournamentPlayer: { include: { player: { select: { avatarUrl: true } } } } },
+        orderBy: { rank: 'asc' },
+      },
       teams: {
         include: {
           members: {
@@ -192,9 +196,9 @@ export async function getTournament(id: string, auth?: AuthContext) {
     subtitle: tournament.subtitle,
     cubeCobraUrl: tournament.cubeCobraUrl,
     bestOfFormat: tournament.bestOfFormat,
-    teamMode: tournament.teamMode,
-    teamSetupTiming: tournament.teamSetupTiming,
     status: tournament.status,
+    teamMode: tournament.teamMode,
+    teamSetupTiming: (tournament as any).teamSetupTiming ?? 'BEFORE_DRAFT',
     organizationId: tournament.organizationId,
     leagueId: tournament.leagueId,
     startedAt: tournament.startedAt?.toISOString() ?? null,
@@ -224,6 +228,23 @@ export async function getTournament(id: string, auth?: AuthContext) {
       : null,
     players: tournament.players.map(serializeEventPlayer),
     rounds: tournament.rounds.map(serializeRound),
+    standings: tournament.standings.map((standing: any) => ({
+      id: standing.id,
+      tournamentId: standing.tournamentId,
+      tournamentPlayerId: standing.tournamentPlayerId,
+      playerId: standing.tournamentPlayer.playerId,
+      rank: standing.rank,
+      matchPoints: standing.matchPoints,
+      matchWins: standing.matchWins,
+      matchLosses: standing.matchLosses,
+      matchDraws: standing.matchDraws,
+      gameWins: standing.gameWins,
+      gameLosses: standing.gameLosses,
+      omwPercent: standing.omwPercent,
+      gwPercent: standing.gwPercent,
+      ogwPercent: standing.ogwPercent,
+      player: serializeEventPlayer(standing.tournamentPlayer),
+    })),
     teams: tournament.teams.map((team: any) => ({
       id: team.id,
       name: team.name,
@@ -253,23 +274,6 @@ export async function getTournament(id: string, auth?: AuthContext) {
         name: standing.team.name,
         seed: standing.team.seed,
       },
-    })),
-    standings: tournament.standings.map((standing: any) => ({
-      id: standing.id,
-      tournamentId: standing.tournamentId,
-      tournamentPlayerId: standing.tournamentPlayerId,
-      playerId: standing.tournamentPlayer.playerId,
-      rank: standing.rank,
-      matchPoints: standing.matchPoints,
-      matchWins: standing.matchWins,
-      matchLosses: standing.matchLosses,
-      matchDraws: standing.matchDraws,
-      gameWins: standing.gameWins,
-      gameLosses: standing.gameLosses,
-      omwPercent: standing.omwPercent,
-      gwPercent: standing.gwPercent,
-      ogwPercent: standing.ogwPercent,
-      player: serializeEventPlayer(standing.tournamentPlayer),
     })),
   };
 }
@@ -333,6 +337,9 @@ export async function addPlayer(
   });
   if (!tournament) throw new Error('Tournament not found');
   if (tournament.status !== 'REGISTRATION') throw new Error('Tournament already started');
+  if (usesTeamDraftMode(tournament.teamMode) && tournament.players.length >= 6) {
+    throw new Error('Team draft mode requires exactly 6 active players');
+  }
 
   const activePlayerCount = tournament.players.length;
   const name = data.name.trim();
@@ -384,9 +391,6 @@ export async function addPlayer(
     throw new Error('Player already added to this tournament');
   }
 
-  if (usesTeamDraftMode((tournament as any).teamMode) && activePlayerCount >= 6) {
-    throw new Error('Team drafts require exactly 6 players');
-  }
   ensureTournamentHasCapacity(tournament.format, activePlayerCount);
 
   if (!player) {
@@ -497,9 +501,9 @@ export async function updateTournament(
   if (data.name !== undefined) updateData.name = data.name.trim();
   if (data.subtitle !== undefined) updateData.subtitle = data.subtitle;
   if ('cubeCobraUrl' in data) updateData.cubeCobraUrl = data.cubeCobraUrl ?? null;
-  if ('leagueId' in data) updateData.leagueId = data.leagueId ?? null;
   if (data.format !== undefined && tournament.status === 'REGISTRATION')
     updateData.format = data.format;
+  if ('leagueId' in data) updateData.leagueId = data.leagueId ?? null;
   if (data.teamMode !== undefined) {
     if (tournament.status !== 'REGISTRATION') {
       throw new Error('Team mode must be configured before the tournament starts');
@@ -530,13 +534,6 @@ export async function randomizeSeats(tournamentId: string) {
     },
   });
   if (!tournament) throw new Error('Tournament not found');
-  if (usesTeamDraftMode((tournament as any).teamMode)) {
-    if (usesBeforeDraftTeamSetup((tournament as any).teamSetupTiming ?? 'BEFORE_DRAFT')) {
-      return randomizeTeamDraftSeats(tournamentId);
-    }
-    return generateRandomTournamentTeams(tournamentId);
-  }
-
   if (!usesDraftPodSeating(tournament.format)) {
     throw new Error('Seat randomization is only available for Draft and Cube tournaments');
   }
@@ -549,6 +546,13 @@ export async function randomizeSeats(tournamentId: string) {
   validateTournamentPlayerCount(tournament.format, tournament.players.length);
 
   const players = [...tournament.players];
+  if (
+    usesTeamDraftMode(tournament.teamMode) &&
+    usesBeforeDraftTeamSetup((tournament as any).teamSetupTiming ?? 'BEFORE_DRAFT')
+  ) {
+    return randomizeTeamDraftSeats(tournamentId);
+  }
+
   for (let i = players.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     [players[i], players[j]] = [players[j], players[i]];
@@ -571,10 +575,7 @@ export async function startTournament(tournamentId: string) {
   if (!tournament) throw new Error('Tournament not found');
   if (tournament.status !== 'REGISTRATION') throw new Error('Tournament already started');
   validateTournamentPlayerCount(tournament.format, tournament.players.length);
-  validateTeamMode(tournament.format, (tournament as any).teamMode, tournament.players.length);
-  if (usesTeamDraftMode((tournament as any).teamMode)) {
-    await generateRandomTournamentTeams(tournamentId);
-  }
+  validateTeamMode(tournament.format, tournament.teamMode, tournament.players.length);
 
   const totalRounds =
     tournament.totalRounds > 0
@@ -613,7 +614,10 @@ export async function generateNextRound(tournamentId: string) {
   let pairings: ReturnType<typeof generatePairings>['pairings'];
   let byePlayerId: string | null;
 
-  if (requiresSeatPairings) {
+  if (usesTeamDraftMode(tournament.teamMode)) {
+    pairings = await buildTeamRoundPairings(tournamentId, newRoundNumber);
+    byePlayerId = null;
+  } else if (requiresSeatPairings) {
     if (!allSeated) {
       throw new Error('Randomize seats before generating round 1');
     }
@@ -624,8 +628,6 @@ export async function generateNextRound(tournamentId: string) {
         seatNumber: player.seatNumber,
       })),
     ));
-  } else if (usesTeamDraftMode((tournament as any).teamMode)) {
-    ({ pairings, byePlayerId } = await buildTeamRoundPairings(tournamentId));
   } else {
     const playerStates = await buildPlayerStates(tournamentId);
     ({ pairings, byePlayerId } = generatePairings(playerStates));
@@ -675,7 +677,7 @@ export async function generateNextRound(tournamentId: string) {
   });
 
   await recalculateStandings(tournamentId);
-  if (usesTeamDraftMode((tournament as any).teamMode)) {
+  if (usesTeamDraftMode(tournament.teamMode)) {
     await recalculateTeamStandings(tournamentId);
   }
 
@@ -683,7 +685,10 @@ export async function generateNextRound(tournamentId: string) {
     where: { id: round.id },
     include: {
       matches: {
-        include: { player1: true, player2: true },
+        include: {
+          player1: { include: { player: { select: { avatarUrl: true } } } },
+          player2: { include: { player: { select: { avatarUrl: true } } } },
+        },
         orderBy: { tableNumber: 'asc' },
       },
     },
@@ -753,13 +758,16 @@ export async function reportResult(
   if (tournament.status === 'FINISHED') {
     await syncTournamentEloToPlayerRatings(match.tournamentId);
   }
-  if (usesTeamDraftMode((tournament as any).teamMode)) {
+  if (usesTeamDraftMode(tournament.teamMode)) {
     await recalculateTeamStandings(match.tournamentId);
   }
 
   const persistedMatch = await prisma.match.findUnique({
     where: { id: matchId },
-    include: { player1: true, player2: true },
+    include: {
+      player1: { include: { player: { select: { avatarUrl: true } } } },
+      player2: { include: { player: { select: { avatarUrl: true } } } },
+    },
   });
 
   return persistedMatch ? serializeMatch(persistedMatch) : null;
@@ -842,8 +850,6 @@ function buildPlayerStats(registrations: any[], leagueId?: string) {
     : registrations;
   const totals = filteredRegistrations.reduce(
     (acc: any, registration: any) => {
-      acc.tournamentsPlayed += 1;
-      if (registration.active) acc.activeRegistrations += 1;
       const trophyOutcome = evaluateTrophyOutcome({
         tournamentStatus: registration.tournament.status,
         teamMode: registration.tournament.teamMode,
@@ -851,6 +857,8 @@ function buildPlayerStats(registrations: any[], leagueId?: string) {
         teamRank: getTeamRankFromMembership(registration.teamMembership),
       });
 
+      acc.tournamentsPlayed += 1;
+      if (registration.active) acc.activeRegistrations += 1;
       if (trophyOutcome.regularTrophy) {
         acc.trophies += 1;
       }

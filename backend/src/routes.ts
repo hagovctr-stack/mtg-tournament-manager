@@ -146,7 +146,6 @@ router.post(
   }),
 );
 
-
 router.patch(
   '/players/:id',
   requireRole('ORG_ADMIN', 'ORGANIZER'),
@@ -281,7 +280,6 @@ router.get(
   }),
 );
 
-
 router.get(
   '/leagues',
   wrap(async (req, res) => {
@@ -323,14 +321,12 @@ router.delete(
   }),
 );
 
-
 router.get(
   '/leagues/:id/standings',
   wrap(async (req, res) => {
     res.json(await leagues.getLeagueStandings(req.params.id, req.auth!));
   }),
 );
-
 
 router.get(
   '/events',

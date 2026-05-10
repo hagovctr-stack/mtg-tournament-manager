@@ -669,9 +669,9 @@ export const openApiDocument = {
         properties: {
           name: { type: 'string' },
           format: { type: 'string' },
+          totalRounds: { type: 'integer' },
           teamMode: { type: 'string', enum: ['NONE', 'TEAM_DRAFT_3V3'] },
           teamSetupTiming: { type: 'string', enum: ['BEFORE_DRAFT', 'AFTER_DRAFT'] },
-          totalRounds: { type: 'integer' },
         },
         required: ['name'],
       },

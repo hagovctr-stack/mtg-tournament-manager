@@ -106,6 +106,12 @@ export const api = {
     request<PlayerSummary>('GET', `/players/${playerId}/summary${toQuery({ leagueId })}`),
   generateRound: (tournamentId: string) =>
     request<Round>('POST', `/tournaments/${tournamentId}/rounds`),
+  generateTeams: (tournamentId: string) =>
+    request<TeamPayload>('POST', `/tournaments/${tournamentId}/teams/generate`),
+  saveTeams: (
+    tournamentId: string,
+    assignments: Array<{ teamSeed: number; tournamentPlayerId: string; seatOrder: number }>,
+  ) => request<TeamPayload>('PATCH', `/tournaments/${tournamentId}/teams`, { assignments }),
   reportResult: (matchId: string, data: ReportResultInput) =>
     request<Match>('PATCH', `/matches/${matchId}/result`, data),
   getStandings: (tournamentId: string, round?: number) =>
@@ -153,6 +159,8 @@ export interface AuthSession {
 }
 
 export type OrganizationRole = 'ORG_ADMIN' | 'ORGANIZER' | 'PLAYER';
+export type TeamMode = 'NONE' | 'TEAM_DRAFT_3V3';
+export type TeamSetupTiming = 'BEFORE_DRAFT' | 'AFTER_DRAFT';
 
 export interface PlayerStats {
   tournamentsPlayed: number;
@@ -187,10 +195,10 @@ export interface PlayerTournamentHistoryEntry {
   matchWins: number;
   matchLosses: number;
   matchDraws: number;
-  earnedTrophy: boolean;
-  earnedTeamDraftTrophy: boolean;
   leagueId: string | null;
   leagueName: string | null;
+  earnedTrophy: boolean;
+  earnedTeamDraftTrophy: boolean;
   format: string;
 }
 
@@ -200,6 +208,15 @@ export interface LeagueRef {
   startsAt: string;
   endsAt: string;
   status: string;
+}
+
+export interface EventStageRef {
+  id: string;
+  name: string;
+  kind: string;
+  sequence: number;
+  eventId: string;
+  eventName: string;
 }
 
 export interface Tournament {
@@ -212,6 +229,8 @@ export interface Tournament {
   status: 'REGISTRATION' | 'ACTIVE' | 'FINISHED';
   totalRounds: number;
   currentRound: number;
+  teamMode: TeamMode;
+  teamSetupTiming: TeamSetupTiming;
   leagueId: string | null;
   organizationId: string | null;
   startedAt: string | null;
@@ -222,19 +241,48 @@ export interface Tournament {
   _count?: { players: number };
 }
 
-export interface EventStageRef {
+export interface TournamentTeamMember {
+  id: string;
+  seatOrder: number;
+  tournamentPlayerId: string;
+  player: Player;
+}
+
+export interface TournamentTeam {
   id: string;
   name: string;
-  kind: string;
-  sequence: number;
-  eventId: string;
-  eventName: string;
+  seed: number;
+  members: TournamentTeamMember[];
+}
+
+export interface TeamStanding {
+  id: string;
+  rank: number;
+  matchPoints: number;
+  roundWins: number;
+  roundLosses: number;
+  roundDraws: number;
+  boardWins: number;
+  boardLosses: number;
+  boardDraws: number;
+  team: {
+    id: string;
+    name: string;
+    seed: number;
+  };
+}
+
+export interface TeamPayload {
+  teams: TournamentTeam[];
+  teamStandings: TeamStanding[];
 }
 
 export interface TournamentDetail extends Tournament {
   players: Player[];
   rounds: RoundDetail[];
   standings: Standing[];
+  teams: TournamentTeam[];
+  teamStandings: TeamStanding[];
   league: LeagueRef | null;
   eventStage: EventStageRef | null;
 }
@@ -244,7 +292,7 @@ export interface Player {
   tournamentPlayerId: string;
   playerId: string | null;
   name: string;
-  dciNumber?: string;
+  dciNumber?: string | null;
   elo: number;
   active: boolean;
   tournamentId: string;
@@ -319,6 +367,8 @@ export interface CreateTournamentInput {
   bestOfFormat?: string;
   totalRounds?: number;
   leagueId?: string | null;
+  teamMode?: TeamMode;
+  teamSetupTiming?: TeamSetupTiming;
 }
 
 export interface UpdateTournamentInput {
@@ -328,6 +378,8 @@ export interface UpdateTournamentInput {
   cubeCobraUrl?: string | null;
   totalRounds?: number;
   leagueId?: string | null;
+  teamMode?: TeamMode;
+  teamSetupTiming?: TeamSetupTiming;
 }
 
 export interface AddPlayerInput {
@@ -374,8 +426,6 @@ export interface LeagueTournamentCard {
 export interface LeagueDetail extends League {
   tournaments: LeagueTournamentCard[];
 }
-
-
 
 export interface LeagueStanding {
   rank: number;
