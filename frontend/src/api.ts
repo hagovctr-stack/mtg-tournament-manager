@@ -115,6 +115,12 @@ export const api = {
   exportCSV: (tournamentId: string) => {
     window.open(`${BASE_URL}/tournaments/${tournamentId}/export`, '_blank');
   },
+  listLeagues: () => request<League[]>('GET', '/leagues'),
+  createLeague: (data: CreateLeagueInput) => request<League>('POST', '/leagues', data),
+  updateLeague: (id: string, data: UpdateLeagueInput) =>
+    request<League>('PATCH', `/leagues/${id}`, data),
+  deleteLeague: (id: string) => request<void>('DELETE', `/leagues/${id}`),
+  getLeague: (id: string) => request<LeagueDetail>('GET', `/leagues/${id}`),
 };
 
 export interface SessionUser {
@@ -172,6 +178,16 @@ export interface PlayerTournamentHistoryEntry {
   matchDraws: number;
   earnedTrophy: boolean;
   earnedTeamDraftTrophy: boolean;
+  leagueId: string | null;
+  leagueName: string | null;
+}
+
+export interface LeagueRef {
+  id: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
 }
 
 export interface Tournament {
@@ -184,7 +200,13 @@ export interface Tournament {
   status: 'REGISTRATION' | 'ACTIVE' | 'FINISHED';
   totalRounds: number;
   currentRound: number;
+  leagueId: string | null;
+  organizationId: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
   createdAt: string;
+  updatedAt: string;
+  league?: LeagueRef | null;
   _count?: { players: number };
 }
 
@@ -192,6 +214,7 @@ export interface TournamentDetail extends Tournament {
   players: Player[];
   rounds: RoundDetail[];
   standings: Standing[];
+  league: LeagueRef | null;
 }
 
 export interface Player {
@@ -273,6 +296,7 @@ export interface CreateTournamentInput {
   cubeCobraUrl?: string;
   bestOfFormat?: string;
   totalRounds?: number;
+  leagueId?: string | null;
 }
 
 export interface UpdateTournamentInput {
@@ -281,6 +305,7 @@ export interface UpdateTournamentInput {
   subtitle?: string;
   cubeCobraUrl?: string | null;
   totalRounds?: number;
+  leagueId?: string | null;
 }
 
 export interface AddPlayerInput {
@@ -298,3 +323,41 @@ export interface ReportResultInput {
 export interface PlayerSummary extends PlayerListItem {
   tournaments: PlayerTournamentHistoryEntry[];
 }
+
+export interface League {
+  id: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  organizationId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  tournamentCount: number;
+}
+
+export interface LeagueTournamentCard {
+  id: string;
+  name: string;
+  format: string;
+  status: string;
+  totalRounds: number;
+  currentRound: number;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  playerCount: number;
+}
+
+export interface LeagueDetail extends League {
+  tournaments: LeagueTournamentCard[];
+}
+
+export interface CreateLeagueInput {
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  status?: string;
+}
+
+export interface UpdateLeagueInput extends Partial<CreateLeagueInput> {}

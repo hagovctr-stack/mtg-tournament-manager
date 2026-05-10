@@ -5,6 +5,7 @@ import multer from 'multer';
 import * as svc from './tournamentService';
 import { getSession, requireRole } from './auth';
 import { getStandings, getStandingsAtRound } from './standingsService';
+import * as leagues from './leagueService';
 import { broadcast } from './websocket';
 
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -42,8 +43,8 @@ router.get(
 
 router.get(
   '/tournaments',
-  wrap(async (_req, res) => {
-    res.json(await svc.listTournaments());
+  wrap(async (req, res) => {
+    res.json(await svc.listTournaments(req.auth));
   }),
 );
 
@@ -51,14 +52,14 @@ router.post(
   '/tournaments',
   requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
-    res.status(201).json(await svc.createTournament(req.body));
+    res.status(201).json(await svc.createTournament(req.body, req.auth));
   }),
 );
 
 router.get(
   '/tournaments/:id',
   wrap(async (req, res) => {
-    const tournament = await svc.getTournament(req.params.id);
+    const tournament = await svc.getTournament(req.params.id, req.auth);
     if (!tournament) return res.status(404).json({ error: 'Not found' });
     res.json(tournament);
   }),
@@ -96,7 +97,7 @@ router.patch(
   '/tournaments/:id',
   requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
-    const t = await svc.updateTournament(req.params.id, req.body);
+    const t = await svc.updateTournament(req.params.id, req.body, req.auth);
     res.json(t);
   }),
 );
@@ -106,15 +107,15 @@ router.post(
   requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     await svc.randomizeSeats(req.params.id);
-    const tournament = await svc.getTournament(req.params.id);
+    const tournament = await svc.getTournament(req.params.id, req.auth);
     res.json(tournament);
   }),
 );
 
 router.get(
   '/players',
-  wrap(async (_req, res) => {
-    res.json(await svc.listPlayers());
+  wrap(async (req, res) => {
+    res.json(await svc.listPlayers(req.auth));
   }),
 );
 
@@ -123,7 +124,7 @@ router.post(
   requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     try {
-      res.status(201).json(await svc.createPlayer(req.body, req.query.force === 'true'));
+      res.status(201).json(await svc.createPlayer(req.body, req.query.force === 'true', req.auth));
     } catch (err: any) {
       res.status(err.status ?? 400).json({ error: err.message, code: err.code });
     }
@@ -240,7 +241,7 @@ router.get(
 router.get(
   '/tournaments/:id/export',
   wrap(async (req, res) => {
-    const tournament = await svc.getTournament(req.params.id);
+    const tournament = await svc.getTournament(req.params.id, req.auth);
     const standings = await getStandings(req.params.id);
     const csv = [
       'Rank,Player,Points,OMW%,GW%,OGW%,W,L,D',
@@ -255,6 +256,48 @@ router.get(
       `attachment; filename="tournament-${tournament?.name ?? req.params.id}.csv"`,
     );
     res.send(csv);
+  }),
+);
+
+
+router.get(
+  '/leagues',
+  wrap(async (req, res) => {
+    res.json(await leagues.listLeagues(req.auth!));
+  }),
+);
+
+router.post(
+  '/leagues',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
+  wrap(async (req, res) => {
+    res.status(201).json(await leagues.createLeague(req.body, req.auth!));
+  }),
+);
+
+router.get(
+  '/leagues/:id',
+  wrap(async (req, res) => {
+    const league = await leagues.getLeague(req.params.id, req.auth!);
+    if (!league) return res.status(404).json({ error: 'Not found' });
+    res.json(league);
+  }),
+);
+
+router.patch(
+  '/leagues/:id',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
+  wrap(async (req, res) => {
+    res.json(await leagues.updateLeague(req.params.id, req.body, req.auth!));
+  }),
+);
+
+router.delete(
+  '/leagues/:id',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
+  wrap(async (req, res) => {
+    await leagues.deleteLeague(req.params.id, req.auth!);
+    res.status(204).end();
   }),
 );
 

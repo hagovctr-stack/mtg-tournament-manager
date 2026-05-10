@@ -1,4 +1,5 @@
 import { prisma } from './db';
+import type { AuthContext } from './auth';
 import {
   generatePairings,
   generateSeatPairings,
@@ -32,6 +33,14 @@ function normalizeName(name: string) {
 function normalizeDciNumber(dciNumber?: string) {
   const normalized = dciNumber?.trim();
   return normalized ? normalized : null;
+}
+
+function buildScopedWhere(id: string, auth?: AuthContext) {
+  return auth?.organizationId ? { id, organizationId: auth.organizationId } : { id };
+}
+
+function buildScopedListWhere(auth?: AuthContext) {
+  return auth?.organizationId ? { organizationId: auth.organizationId } : {};
 }
 
 const VALID_BEST_OF_FORMATS = ['BO1', 'BO3', 'BO5', 'FREE'] as const;
@@ -70,16 +79,20 @@ function validateResult(wins1: number, wins2: number, format: BestOfFormat): voi
   // FREE: no restrictions
 }
 
-export async function createTournament(data: {
-  name: string;
-  format?: string;
-  subtitle?: string;
-  cubeCobraUrl?: string;
-  bestOfFormat?: string;
-  totalRounds?: number;
-  teamMode?: string;
-  teamSetupTiming?: string;
-}) {
+export async function createTournament(
+  data: {
+    name: string;
+    format?: string;
+    subtitle?: string;
+    cubeCobraUrl?: string;
+    bestOfFormat?: string;
+    totalRounds?: number;
+    leagueId?: string | null;
+    teamMode?: string;
+    teamSetupTiming?: string;
+  },
+  auth?: AuthContext,
+) {
   const bestOfFormat = (data.bestOfFormat ?? 'BO3').toUpperCase();
   if (!VALID_BEST_OF_FORMATS.includes(bestOfFormat as BestOfFormat)) {
     throw new Error(`Invalid bestOfFormat. Must be one of: ${VALID_BEST_OF_FORMATS.join(', ')}`);
@@ -97,14 +110,18 @@ export async function createTournament(data: {
       totalRounds: data.totalRounds ?? 0,
       teamMode,
       teamSetupTiming: normalizeTeamSetupTiming(data.teamSetupTiming),
-    },
+      leagueId: data.leagueId ?? null,
+      organizationId: auth?.organizationId ?? null,
+      createdById: auth?.userId ?? null,
+    } as any,
   });
 }
 
-export async function getTournament(id: string) {
-  const tournament = await prisma.tournament.findUnique({
-    where: { id },
+export async function getTournament(id: string, auth?: AuthContext) {
+  const tournament = await prisma.tournament.findFirst({
+    where: buildScopedWhere(id, auth),
     include: {
+      league: true,
       players: {
         where: { active: true },
         orderBy: [{ seatNumber: 'asc' }, { id: 'asc' }],
@@ -151,10 +168,23 @@ export async function getTournament(id: string) {
     teamMode: tournament.teamMode,
     teamSetupTiming: tournament.teamSetupTiming,
     status: tournament.status,
+    organizationId: tournament.organizationId,
+    leagueId: tournament.leagueId,
+    startedAt: tournament.startedAt?.toISOString() ?? null,
+    finishedAt: tournament.finishedAt?.toISOString() ?? null,
     totalRounds: tournament.totalRounds,
     currentRound: tournament.currentRound,
     createdAt: tournament.createdAt.toISOString(),
     updatedAt: tournament.updatedAt.toISOString(),
+    league: tournament.league
+      ? {
+          id: tournament.league.id,
+          name: tournament.league.name,
+          startsAt: tournament.league.startsAt.toISOString(),
+          endsAt: tournament.league.endsAt.toISOString(),
+          status: tournament.league.status,
+        }
+      : null,
     players: tournament.players.map(serializeEventPlayer),
     rounds: tournament.rounds.map(serializeRound),
     teams: tournament.teams.map((team: any) => ({
@@ -207,16 +237,18 @@ export async function getTournament(id: string) {
   };
 }
 
-export async function listTournaments() {
+export async function listTournaments(auth?: AuthContext) {
   return prisma.tournament.findMany({
+    where: buildScopedListWhere(auth),
     orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { players: true } } },
+    include: { league: true, _count: { select: { players: true } } },
   });
 }
 
 export async function createPlayer(
   data: { name: string; dciNumber?: string; elo?: number },
   force = false,
+  auth?: AuthContext,
 ) {
   const name = data.name.trim();
   if (!name) throw new Error('Player name is required');
@@ -244,6 +276,7 @@ export async function createPlayer(
       normalizedName,
       dciNumber,
       rating: data.elo ?? 1500,
+      organizationId: auth?.organizationId ?? null,
     },
   });
 
@@ -304,6 +337,7 @@ export async function addPlayer(
         normalizedName,
         dciNumber: null,
         rating: fallbackRating,
+        organizationId: tournament.organizationId,
       },
     });
     resolvedRegistration = null;
@@ -325,6 +359,7 @@ export async function addPlayer(
         normalizedName,
         dciNumber,
         rating: data.elo ?? 1500,
+        organizationId: tournament.organizationId,
       },
     });
   }
@@ -386,17 +421,20 @@ export async function updateTournament(
     subtitle?: string;
     cubeCobraUrl?: string | null;
     totalRounds?: number;
+    leagueId?: string | null;
     teamMode?: string;
     teamSetupTiming?: string;
   },
+  auth?: AuthContext,
 ) {
-  const tournament = await prisma.tournament.findUnique({ where: { id } });
+  const tournament = await prisma.tournament.findFirst({ where: buildScopedWhere(id, auth) });
   if (!tournament) throw new Error('Tournament not found');
 
   const updateData: Record<string, unknown> = {};
   if (data.name !== undefined) updateData.name = data.name.trim();
   if (data.subtitle !== undefined) updateData.subtitle = data.subtitle;
   if ('cubeCobraUrl' in data) updateData.cubeCobraUrl = data.cubeCobraUrl ?? null;
+  if ('leagueId' in data) updateData.leagueId = data.leagueId ?? null;
   if (data.format !== undefined && tournament.status === 'REGISTRATION')
     updateData.format = data.format;
   if (data.teamMode !== undefined && tournament.status === 'REGISTRATION') {
@@ -830,8 +868,9 @@ function serializeGlobalPlayerSummary(player: any) {
   };
 }
 
-export async function listPlayers() {
+export async function listPlayers(auth?: AuthContext) {
   const players = await prisma.player.findMany({
+    where: buildScopedListWhere(auth),
     include: {
       tournaments: {
         include: {
@@ -866,9 +905,11 @@ export async function listPlayers() {
   });
 }
 
-export async function getPlayerSummary(playerId: string) {
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
+export async function getPlayerSummary(playerId: string, auth?: AuthContext) {
+  const player = await prisma.player.findFirst({
+    where: auth?.organizationId
+      ? { id: playerId, organizationId: auth.organizationId }
+      : { id: playerId },
     include: {
       tournaments: {
         include: {
