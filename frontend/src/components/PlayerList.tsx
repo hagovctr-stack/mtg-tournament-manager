@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type Player, type PlayerListItem } from '../api';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface PlayerListProps {
   tournamentId: string;
@@ -90,104 +91,100 @@ export function PlayerList({ tournamentId, players, canEdit, onUpdate }: PlayerL
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-800">Players ({players.length})</h2>
-          <p className="text-sm text-gray-500">
-            Linked player names open lifetime history and ELO evolution.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          {players.length} {players.length === 1 ? 'Player' : 'Players'}
+        </span>
 
-      {canEdit && (
-        <div className="space-y-3">
-          <form onSubmit={handleAdd} className="flex gap-2 flex-wrap">
+        {canEdit && (
+          <form onSubmit={handleAdd} className="flex gap-2 flex-wrap items-center">
             <input
               type="text"
               placeholder="Player name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="flex-1 min-w-[180px] border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="text"
-              placeholder="DCI # (optional)"
-              value={dci}
-              onChange={(e) => setDci(e.target.value)}
-              className="w-40 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="min-w-[160px] rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
             />
             <button
               type="submit"
               disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-semibold disabled:opacity-50"
+              className="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
             >
-              {loading ? 'Adding...' : 'Add Player'}
+              {loading ? 'Adding…' : 'Add'}
             </button>
           </form>
+        )}
+      </div>
 
-          {matchingCandidates.length > 0 && (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <p className="text-xs uppercase tracking-wide text-gray-500">
-                Existing player suggestions
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {matchingCandidates.map((candidate) => (
-                  <button
-                    key={candidate.id}
-                    type="button"
-                    onClick={() => applyCandidate(candidate)}
-                    className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:border-blue-400 hover:text-blue-700"
-                    title={formatSuggestion(candidate)}
-                  >
-                    {candidate.name}
-                    {candidate.dciNumber ? ` · ${candidate.dciNumber}` : ''}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+      {canEdit && matchingCandidates.length > 0 && (
+        <div className="rounded-[1.3rem] border border-stone-200 bg-stone-50 px-4 py-3">
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Existing player suggestions
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {matchingCandidates.map((candidate) => (
+              <button
+                key={candidate.id}
+                type="button"
+                onClick={() => applyCandidate(candidate)}
+                className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                title={formatSuggestion(candidate)}
+              >
+                {candidate.name}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && (
+        <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="bg-gray-100 text-gray-600 uppercase text-xs">
-              <th className="px-4 py-2 text-left">{hasSeatAssignments ? 'Seat' : '#'}</th>
-              <th className="px-4 py-2 text-left">Name</th>
-              <th className="px-4 py-2 text-left">DCI</th>
-              <th className="px-4 py-2 text-left">ELO</th>
-              {canEdit && <th className="px-4 py-2 text-left">Action</th>}
+      <div className="overflow-x-auto rounded-[1.3rem] border border-stone-200 bg-white">
+        <table className="min-w-full table-fixed text-sm">
+          <thead className="border-b border-stone-200 bg-stone-50/80">
+            <tr className="text-left text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <th className="w-20 px-6 py-3">{hasSeatAssignments ? 'Seat' : '#'}</th>
+              <th className="w-48 px-5 py-3">Name</th>
+              <th className="w-28 pl-5 pr-6 py-3 text-right">ELO</th>
+              {canEdit && <th className="w-24 pl-5 pr-6 py-3 text-right">Action</th>}
             </tr>
           </thead>
           <tbody>
             {visiblePlayers.map((player, index) => (
-              <tr key={player.id} className="border-t border-gray-100 hover:bg-gray-50">
-                <td className="px-4 py-2 text-gray-400">
+              <tr
+                key={player.id}
+                className="border-b border-stone-100 text-sm transition hover:bg-stone-50/55"
+              >
+                <td className="px-6 py-4 font-mono text-sm text-slate-400">
                   {hasSeatAssignments ? (player.seatNumber ?? '—') : index + 1}
                 </td>
-                <td className="px-4 py-2 font-medium text-gray-800">
+                <td className="px-5 py-4 font-medium text-slate-800">
                   {player.playerId ? (
                     <Link
                       to={`/players/${player.playerId}`}
-                      className="hover:text-blue-600 hover:underline"
+                      className="flex items-center gap-3 hover:underline"
                     >
+                      <PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} size="sm" />
                       {player.name}
                     </Link>
                   ) : (
-                    player.name
+                    <div className="flex items-center gap-3">
+                      <PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} size="sm" />
+                      {player.name}
+                    </div>
                   )}
                 </td>
-                <td className="px-4 py-2 text-gray-500">{player.dciNumber ?? '—'}</td>
-                <td className="px-4 py-2 text-gray-500">{player.elo}</td>
+                <td className="pl-5 pr-6 py-4 text-right text-slate-500">{player.elo}</td>
                 {canEdit && (
-                  <td className="px-4 py-2">
+                  <td className="pl-5 pr-6 py-4 text-right">
                     <button
                       onClick={() => handleDrop(player.id, player.name)}
-                      className="text-red-500 hover:text-red-700 text-xs font-semibold"
+                      className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:border-red-200 hover:bg-red-50"
                     >
                       Drop
                     </button>

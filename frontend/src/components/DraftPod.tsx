@@ -1,12 +1,15 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { type Player, type Tournament } from '../api';
 
+import { Link } from 'react-router-dom';
+
 interface DraftPodProps {
   players: Player[];
   status: Tournament['status'];
   canRandomize: boolean;
   isRandomizing: boolean;
   onRandomize: () => void;
+  storageKey?: string;
 }
 
 const TABLE_RADIUS_BY_COUNT: Record<number, number> = {
@@ -29,8 +32,11 @@ export function DraftPod({
   canRandomize,
   isRandomizing,
   onRandomize,
+  storageKey,
 }: DraftPodProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() =>
+    storageKey ? localStorage.getItem(storageKey) === 'true' : false,
+  );
   const activePlayers = players.filter((player) => player.active);
   const seatedPlayers = [...activePlayers]
     .filter((player) => player.seatNumber != null)
@@ -40,18 +46,19 @@ export function DraftPod({
   useEffect(() => {
     if (!canCollapse) {
       setCollapsed(false);
+      if (storageKey) localStorage.setItem(storageKey, 'false');
     }
-  }, [canCollapse]);
+  }, [canCollapse, storageKey]);
 
   if (seatedPlayers.length === 0) {
     return (
-      <section className="mb-5 rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#faf5ff_0%,#ffffff_100%)] p-4 shadow-sm">
+      <section className="mb-5 rounded-[1.75rem] border border-white/80 bg-[linear-gradient(180deg,#fff1ee_0%,#ffffff_100%)] p-4 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-purple-700">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-700">
               Draft Pod
             </p>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-slate-600">
               {status === 'REGISTRATION'
                 ? 'Start the tournament to assign seats.'
                 : 'Randomize seats to lock the pod layout for round 1.'}
@@ -61,7 +68,7 @@ export function DraftPod({
             <button
               onClick={onRandomize}
               disabled={isRandomizing || activePlayers.length < 2}
-              className="rounded-lg border border-purple-200 bg-white px-3 py-2 text-xs font-semibold text-purple-700 shadow-sm hover:border-purple-300 hover:bg-purple-50 disabled:opacity-50"
+              className="rounded-2xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm hover:border-rose-300 hover:bg-rose-50 disabled:opacity-50"
             >
               {isRandomizing ? 'Randomizing...' : 'Randomize Seats'}
             </button>
@@ -72,19 +79,25 @@ export function DraftPod({
   }
 
   return (
-    <section className="mb-5 rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#faf5ff_0%,#ffffff_100%)] p-4 shadow-sm">
+    <section className="mb-5 rounded-[1.75rem] border border-white/80 bg-[linear-gradient(180deg,#fff1ee_0%,#ffffff_100%)] p-4 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-purple-700">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-700">
             Draft Pod
           </p>
-          <p className="mt-1 text-sm text-slate-500">{seatedPlayers.length} seats assigned</p>
+          <p className="mt-1 text-sm text-slate-600">{seatedPlayers.length} seats assigned</p>
         </div>
         <div className="flex items-center gap-2">
           {canCollapse && (
             <button
-              onClick={() => setCollapsed((current) => !current)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-slate-50"
+              onClick={() => {
+                setCollapsed((current) => {
+                  const next = !current;
+                  if (storageKey) localStorage.setItem(storageKey, String(next));
+                  return next;
+                });
+              }}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-slate-50"
             >
               {collapsed ? 'Show Pod' : 'Hide Pod'}
             </button>
@@ -93,7 +106,7 @@ export function DraftPod({
             <button
               onClick={onRandomize}
               disabled={isRandomizing}
-              className="rounded-lg border border-purple-200 bg-white px-3 py-2 text-xs font-semibold text-purple-700 shadow-sm hover:border-purple-300 hover:bg-purple-50 disabled:opacity-50"
+              className="rounded-2xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm hover:border-rose-300 hover:bg-rose-50 disabled:opacity-50"
             >
               {isRandomizing ? 'Randomizing...' : 'Re-randomize'}
             </button>
@@ -126,6 +139,7 @@ export function DraftPod({
                   seat={player.seatNumber!}
                   name={player.name}
                   avatarUrl={player.avatarUrl}
+                  playerId={player.playerId}
                   angle={angle}
                   style={style}
                 />
@@ -167,12 +181,14 @@ function SeatNode({
   seat,
   name,
   avatarUrl,
+  playerId,
   angle,
   style,
 }: {
   seat: number;
   name: string;
   avatarUrl: string | null;
+  playerId: string | null;
   angle: number;
   style: CSSProperties;
 }) {
@@ -185,34 +201,37 @@ function SeatNode({
     ? 'translate(-50%, calc(-100% + 32px))' // card above → avatar sits at bottom of node, on the ring
     : 'translate(-50%, -32px)'; // card below → avatar sits at top of node, on the ring
 
-  return (
-    <div className="absolute w-[120px] sm:w-[136px]" style={{ ...style, transform }}>
-      <div
-        className={`flex ${isUpperHalf ? 'flex-col-reverse' : 'flex-col'} items-center gap-1.5 text-center`}
-      >
-        <div className="relative">
-          {avatarUrl ? (
-            <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-white shadow-lg ring-2 ring-purple-400">
-              <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
-            </div>
-          ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-white bg-purple-600 shadow-lg text-xl font-bold text-white">
-              {name.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-slate-800 text-[10px] font-bold text-white shadow">
-            {seat}
+  const content = (
+    <div
+      className={`flex ${isUpperHalf ? 'flex-col-reverse' : 'flex-col'} items-center gap-1.5 text-center`}
+    >
+      <div className="relative">
+        {avatarUrl ? (
+          <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-white shadow-lg ring-2 ring-rose-300">
+            <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
           </div>
-        </div>
-        <div className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-xl shadow-slate-300/60">
-          <p className="truncate text-xs font-semibold leading-tight text-slate-800" title={name}>
-            {firstLine}
-          </p>
-          <p className="truncate text-xs font-semibold leading-tight text-slate-700" title={name}>
-            {secondLine || '\u00a0'}
-          </p>
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-white bg-rose-600 shadow-lg text-xl font-bold text-white">
+            {name.charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-slate-800 text-[10px] font-bold text-white shadow">
+          {seat}
         </div>
       </div>
+      <div className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-xl shadow-slate-300/60">
+        <p className="truncate text-xs font-semibold leading-tight text-slate-800" title={name}>
+          {firstLine}
+        </p>
+        <p className="truncate text-xs font-semibold leading-tight text-slate-700" title={name}>
+          {secondLine || '\u00a0'}
+        </p>
+      </div>
+    </div>
+  );
+  return (
+    <div className="absolute w-[120px] sm:w-[136px]" style={{ ...style, transform }}>
+      {playerId ? <Link to={`/players/${playerId}`}>{content}</Link> : content}
     </div>
   );
 }

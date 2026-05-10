@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type Standing } from '../api';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface StandingsTableProps {
   tournamentId: string;
@@ -97,17 +98,17 @@ export function StandingsTable({
   const showNav = finishedRounds.length > 0;
 
   return (
-    <div>
+    <div className="space-y-6">
       {showNav && (
-        <div className="flex items-center gap-1 mb-4 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {finishedRounds.map((r) => (
             <button
               key={r}
               onClick={() => setSelectedRound(r)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+              className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold transition ${
                 selectedRound === r
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-slate-950 text-white shadow-[0_14px_28px_rgba(15,23,42,0.16)]'
+                  : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
               }`}
             >
               After R{r}
@@ -115,10 +116,10 @@ export function StandingsTable({
           ))}
           <button
             onClick={() => setSelectedRound(null)}
-            className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+            className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold transition ${
               selectedRound === null
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-slate-950 text-white shadow-[0_14px_28px_rgba(15,23,42,0.16)]'
+                : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
             }`}
           >
             Current
@@ -127,61 +128,79 @@ export function StandingsTable({
       )}
 
       {displayedStandings.length === 0 ? (
-        <p className="text-gray-400 text-sm text-center py-8">No standings yet.</p>
+        <p className="text-slate-400 text-sm text-center py-8">No standings yet.</p>
       ) : (
-        <div className="overflow-x-auto">
-          {loading && <p className="text-xs text-gray-400 mb-2">Loading…</p>}
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="bg-gray-100 text-gray-600 uppercase text-xs">
-                <th className="px-4 py-2 text-left">Rank</th>
-                {prevStandings && <th className="px-3 py-2 text-center">±</th>}
-                <th className="px-4 py-2 text-left">Player</th>
-                <th className="px-4 py-2 text-center">Pts</th>
-                <th className="px-4 py-2 text-center">W-L-D</th>
-                <th className="px-4 py-2 text-center">OMW%</th>
-                <th className="px-4 py-2 text-center">GW%</th>
-                <th className="px-4 py-2 text-center">OGW%</th>
+        <div className="overflow-x-auto rounded-[1.3rem] border border-stone-200 bg-white">
+          {loading && <p className="text-xs text-slate-400 px-5 pt-3">Loading…</p>}
+          <table className="min-w-full table-fixed text-sm">
+            <thead className="border-b border-stone-200 bg-stone-50/80">
+              <tr className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <th className="w-16 pl-6 pr-3 py-3 text-left">Rank</th>
+                <th className="w-10 px-3 py-3 text-center">±</th>
+                <th className="w-48 px-5 py-3 text-left">Player</th>
+                <th className="w-16 px-4 py-3 text-center">PTS</th>
+                <th className="w-24 px-4 py-3 text-center">W-L-D</th>
+                <th className="w-20 px-4 py-3 text-center">OMW%</th>
+                <th className="w-20 px-4 py-3 text-center">GW%</th>
+                <th className="w-20 px-4 pr-6 py-3 text-center">OGW%</th>
               </tr>
             </thead>
             <tbody>
               {displayedStandings.map((standing) => (
                 <tr
                   key={standing.id}
-                  className={`border-t border-gray-100 hover:bg-gray-50 ${
+                  className={`border-b border-stone-100 text-sm transition hover:bg-stone-50/55 ${
                     finished && selectedRound === null && standing.rank <= 3 ? 'bg-amber-50' : ''
                   }`}
                 >
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="font-mono text-gray-600">{standing.rank}</span>
+                  <td className="pl-6 pr-3 py-4 whitespace-nowrap">
+                    <span className="font-mono text-slate-600">{standing.rank}</span>
                     {medal(standing.rank) && <span className="ml-1">{medal(standing.rank)}</span>}
                   </td>
-                  {prevStandings && <td className="px-3 py-3 text-center">{rankDiff(standing)}</td>}
-                  <td className="px-4 py-3 font-medium text-gray-800">
+                  <td className="px-3 py-4 text-center">
+                    {prevStandings ? (
+                      rankDiff(standing)
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-4 font-medium text-slate-800">
                     {standing.player.playerId ? (
                       <Link
                         to={`/players/${standing.player.playerId}`}
-                        className="hover:text-blue-600 hover:underline"
+                        className="flex items-center gap-3 hover:underline"
                       >
+                        <PlayerAvatar
+                          name={standing.player.name}
+                          avatarUrl={standing.player.avatarUrl}
+                          size="sm"
+                        />
                         {standing.player.name}
                       </Link>
                     ) : (
-                      standing.player.name
+                      <div className="flex items-center gap-3">
+                        <PlayerAvatar
+                          name={standing.player.name}
+                          avatarUrl={standing.player.avatarUrl}
+                          size="sm"
+                        />
+                        {standing.player.name}
+                      </div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-center font-bold text-gray-800">
+                  <td className="px-4 py-4 text-center font-bold text-slate-800">
                     {standing.matchPoints}
                   </td>
-                  <td className="px-4 py-3 text-center text-gray-600">
+                  <td className="px-4 py-4 text-center text-slate-600">
                     {standing.matchWins}-{standing.matchLosses}-{standing.matchDraws}
                   </td>
-                  <td className="px-4 py-3 text-center text-gray-500">
+                  <td className="px-4 py-4 text-center text-slate-500">
                     {(standing.omwPercent * 100).toFixed(1)}%
                   </td>
-                  <td className="px-4 py-3 text-center text-gray-500">
+                  <td className="px-4 py-4 text-center text-slate-500">
                     {(standing.gwPercent * 100).toFixed(1)}%
                   </td>
-                  <td className="px-4 py-3 text-center text-gray-500">
+                  <td className="px-4 pr-6 py-4 text-center text-slate-500">
                     {(standing.ogwPercent * 100).toFixed(1)}%
                   </td>
                 </tr>

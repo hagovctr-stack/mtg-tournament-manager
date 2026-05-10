@@ -194,7 +194,7 @@ export async function recalculateStandings(tournamentId: string): Promise<void> 
 export async function getStandings(tournamentId: string) {
   const standings = await prisma.standing.findMany({
     where: { tournamentId },
-    include: { tournamentPlayer: true },
+    include: { tournamentPlayer: { include: { player: { select: { avatarUrl: true } } } } },
     orderBy: { rank: 'asc' },
   });
 
@@ -205,7 +205,7 @@ export async function getStandingsAtRound(tournamentId: string, upToRound: numbe
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
     include: {
-      players: { where: { active: true } },
+      players: { where: { active: true }, include: { player: { select: { avatarUrl: true } } } },
       rounds: {
         where: { status: 'FINISHED', number: { lte: upToRound } },
         include: { matches: true },
@@ -382,6 +382,7 @@ export async function getStandingsAtRound(tournamentId: string, upToRound: numbe
         active: tp.active,
         tournamentId: tp.tournamentId,
         seatNumber: (tp as any).seatNumber ?? null,
+        avatarUrl: (tp as any).player?.avatarUrl ?? null,
       },
     };
   });
