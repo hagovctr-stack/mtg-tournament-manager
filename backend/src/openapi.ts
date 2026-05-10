@@ -553,6 +553,8 @@ export const openApiDocument = {
         properties: {
           tournamentsPlayed: { type: 'integer' },
           activeRegistrations: { type: 'integer' },
+          trophies: { type: 'integer' },
+          teamDraftTrophies: { type: 'integer' },
           matchWins: { type: 'integer' },
           matchLosses: { type: 'integer' },
           matchDraws: { type: 'integer' },
@@ -566,6 +568,8 @@ export const openApiDocument = {
         required: [
           'tournamentsPlayed',
           'activeRegistrations',
+          'trophies',
+          'teamDraftTrophies',
           'matchWins',
           'matchLosses',
           'matchDraws',
@@ -596,6 +600,8 @@ export const openApiDocument = {
           matchWins: { type: 'integer' },
           matchLosses: { type: 'integer' },
           matchDraws: { type: 'integer' },
+          earnedTrophy: { type: 'boolean' },
+          earnedTeamDraftTrophy: { type: 'boolean' },
         },
         required: [
           'tournamentId',
@@ -613,6 +619,8 @@ export const openApiDocument = {
           'matchWins',
           'matchLosses',
           'matchDraws',
+          'earnedTrophy',
+          'earnedTeamDraftTrophy',
         ],
       },
       PlayerListItem: {

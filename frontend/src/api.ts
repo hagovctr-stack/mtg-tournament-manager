@@ -141,6 +141,7 @@ export interface PlayerStats {
   tournamentsPlayed: number;
   activeRegistrations: number;
   trophies: number;
+  teamDraftTrophies: number;
   matchWins: number;
   matchLosses: number;
   matchDraws: number;
@@ -169,6 +170,8 @@ export interface PlayerTournamentHistoryEntry {
   matchWins: number;
   matchLosses: number;
   matchDraws: number;
+  earnedTrophy: boolean;
+  earnedTeamDraftTrophy: boolean;
 }
 
 export interface Tournament {

@@ -20,6 +20,7 @@ import {
   saveTeamAssignments,
   serializeTeams,
 } from './teamService';
+import { evaluateTrophyOutcome, getTeamRankFromMembership } from './trophyService';
 
 function normalizeName(name: string) {
   return name.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -697,8 +698,18 @@ function buildPlayerStats(registrations: any[]) {
     (acc: any, registration: any) => {
       acc.tournamentsPlayed += 1;
       if (registration.active) acc.activeRegistrations += 1;
-      if (registration.tournament.status === 'FINISHED' && registration.standing?.rank === 1) {
+      const trophyOutcome = evaluateTrophyOutcome({
+        tournamentStatus: registration.tournament.status,
+        teamMode: registration.tournament.teamMode,
+        individualRank: registration.standing?.rank ?? null,
+        teamRank: getTeamRankFromMembership(registration.teamMembership),
+      });
+
+      if (trophyOutcome.regularTrophy) {
         acc.trophies += 1;
+      }
+      if (trophyOutcome.teamDraftTrophy) {
+        acc.teamDraftTrophies += 1;
       }
       if (registration.standing) {
         acc.matchWins += registration.standing.matchWins;
@@ -714,6 +725,7 @@ function buildPlayerStats(registrations: any[]) {
       tournamentsPlayed: 0,
       activeRegistrations: 0,
       trophies: 0,
+      teamDraftTrophies: 0,
       matchWins: 0,
       matchLosses: 0,
       matchDraws: 0,
@@ -751,6 +763,13 @@ function serializeGlobalPlayerBase(player: any) {
 }
 
 function serializePlayerTournamentHistoryEntry(registration: any) {
+  const trophyOutcome = evaluateTrophyOutcome({
+    tournamentStatus: registration.tournament.status,
+    teamMode: registration.tournament.teamMode,
+    individualRank: registration.standing?.rank ?? null,
+    teamRank: getTeamRankFromMembership(registration.teamMembership),
+  });
+
   return {
     tournamentId: registration.tournamentId,
     tournamentPlayerId: registration.id,
@@ -768,6 +787,8 @@ function serializePlayerTournamentHistoryEntry(registration: any) {
     matchWins: registration.standing?.matchWins ?? 0,
     matchLosses: registration.standing?.matchLosses ?? 0,
     matchDraws: registration.standing?.matchDraws ?? 0,
+    earnedTrophy: trophyOutcome.regularTrophy,
+    earnedTeamDraftTrophy: trophyOutcome.teamDraftTrophy,
   };
 }
 
@@ -787,6 +808,19 @@ export async function listPlayers() {
         include: {
           tournament: true,
           standing: true,
+          teamMembership: {
+            include: {
+              team: {
+                include: {
+                  standings: {
+                    select: { rank: true },
+                    orderBy: { rank: 'asc' },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          },
         },
         orderBy: { tournament: { createdAt: 'desc' } },
       },
@@ -811,6 +845,19 @@ export async function getPlayerSummary(playerId: string) {
         include: {
           tournament: true,
           standing: true,
+          teamMembership: {
+            include: {
+              team: {
+                include: {
+                  standings: {
+                    select: { rank: true },
+                    orderBy: { rank: 'asc' },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          },
         },
         orderBy: { tournament: { createdAt: 'desc' } },
       },
