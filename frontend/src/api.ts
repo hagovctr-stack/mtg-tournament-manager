@@ -83,6 +83,10 @@ export const api = {
   dropPlayer: (playerId: string) => request<Player>('DELETE', `/players/${playerId}`),
   deletePlayer: (playerId: string) =>
     request<{ id: string }>('DELETE', `/players/${playerId}/profile`),
+  updatePlayer: (
+    playerId: string,
+    data: { name?: string; dciNumber?: string | null; rating?: number },
+  ) => request<PlayerListItem>('PATCH', `/players/${playerId}`, data),
   uploadPlayerAvatar: (playerId: string, file: File) => {
     const form = new FormData();
     form.append('avatar', file);

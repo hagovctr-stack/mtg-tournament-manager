@@ -142,6 +142,19 @@ router.post(
   }),
 );
 
+
+router.patch(
+  '/players/:id',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
+  wrap(async (req, res) => {
+    try {
+      res.json(await svc.updateGlobalPlayer(req.params.id, req.body));
+    } catch (err: any) {
+      res.status(err.status ?? 400).json({ error: err.message });
+    }
+  }),
+);
+
 router.delete(
   '/players/:id',
   requireRole('ORG_ADMIN', 'ORGANIZER'),

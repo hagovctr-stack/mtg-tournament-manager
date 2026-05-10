@@ -423,6 +423,31 @@ export async function deleteGlobalPlayer(id: string) {
   return prisma.player.delete({ where: { id } });
 }
 
+export async function updateGlobalPlayer(
+  id: string,
+  data: { name?: string; dciNumber?: string | null; rating?: number },
+) {
+  const updates: Parameters<typeof prisma.player.update>[0]['data'] = {};
+  if (data.name !== undefined) {
+    const name = data.name.trim();
+    if (!name) throw Object.assign(new Error('Player name is required'), { status: 400 });
+    updates.name = name;
+    updates.normalizedName = normalizeName(name);
+  }
+  if ('dciNumber' in data) {
+    updates.dciNumber = data.dciNumber ? normalizeDciNumber(data.dciNumber) : null;
+  }
+  if (data.rating !== undefined) {
+    const rating = Number(data.rating);
+    if (!Number.isFinite(rating) || rating < 0) {
+      throw Object.assign(new Error('Invalid ELO value'), { status: 400 });
+    }
+    updates.rating = rating;
+  }
+  const player = await prisma.player.update({ where: { id }, data: updates });
+  return serializeGlobalPlayerBase(player);
+}
+
 export async function updatePlayerAvatar(id: string, avatarUrl: string) {
   const player = await prisma.player.update({ where: { id }, data: { avatarUrl } });
   return serializeGlobalPlayerBase(player);
