@@ -15,10 +15,13 @@ import { recalculateStandings } from './standingsService';
 import { serializeEventPlayer, serializeMatch, serializeRound } from './presenters';
 import {
   buildTeamRoundPairings,
-  generateBalancedTeams,
+  generateRandomTournamentTeams,
+  getTournamentTeams,
   recalculateTeamStandings,
-  saveTeamAssignments,
-  serializeTeams,
+  randomizeTeamDraftSeats,
+  saveTournamentTeams as persistTournamentTeams,
+  usesBeforeDraftTeamSetup,
+  usesTeamDraftMode,
 } from './teamService';
 import { evaluateTrophyOutcome, getTeamRankFromMembership } from './trophyService';
 
@@ -34,29 +37,18 @@ function normalizeDciNumber(dciNumber?: string) {
 const VALID_BEST_OF_FORMATS = ['BO1', 'BO3', 'BO5', 'FREE'] as const;
 type BestOfFormat = (typeof VALID_BEST_OF_FORMATS)[number];
 
-function usesTeamDraftMode(teamMode?: string | null) {
-  return teamMode === 'TEAM_DRAFT_3V3';
-}
-
-function validateTeamMode(data: { teamMode?: string; teamSetupTiming?: string; format?: string }) {
-  const teamMode = data.teamMode ?? 'NONE';
-  if (!['NONE', 'TEAM_DRAFT_3V3'].includes(teamMode)) {
-    throw new Error('Invalid team mode');
+function validateTeamMode(format: string, teamMode?: string, playerCount?: number) {
+  if (!usesTeamDraftMode(teamMode ?? 'NONE')) return;
+  if (!['Draft', 'Cube'].includes(format)) {
+    throw new Error('Team draft mode is only available for Draft and Cube');
   }
-
-  const teamSetupTiming = data.teamSetupTiming ?? 'BEFORE_DRAFT';
-  if (!['BEFORE_DRAFT', 'AFTER_DRAFT'].includes(teamSetupTiming)) {
-    throw new Error('Invalid team setup timing');
-  }
-
-  if (teamMode === 'TEAM_DRAFT_3V3' && data.format && !usesDraftPodSeating(data.format)) {
-    throw new Error('Team draft mode is only available for Draft and Cube tournaments');
+  if (playerCount !== undefined && playerCount !== 6) {
+    throw new Error('Team draft mode requires exactly 6 active players');
   }
 }
 
-function normalizeTeamSetupTiming(teamMode?: string, teamSetupTiming?: string) {
-  if (teamMode !== 'TEAM_DRAFT_3V3') return 'BEFORE_DRAFT';
-  return teamSetupTiming ?? 'BEFORE_DRAFT';
+function normalizeTeamSetupTiming(teamSetupTiming?: string) {
+  return teamSetupTiming === 'AFTER_DRAFT' ? 'AFTER_DRAFT' : 'BEFORE_DRAFT';
 }
 
 function validateResult(wins1: number, wins2: number, format: BestOfFormat): void {
@@ -93,8 +85,8 @@ export async function createTournament(data: {
     throw new Error(`Invalid bestOfFormat. Must be one of: ${VALID_BEST_OF_FORMATS.join(', ')}`);
   }
   const format = data.format ?? 'Cube';
-  const teamMode = data.teamMode ?? 'NONE';
-  validateTeamMode({ teamMode, teamSetupTiming: data.teamSetupTiming, format });
+  const teamMode = data.teamMode === 'TEAM_DRAFT_3V3' ? 'TEAM_DRAFT_3V3' : 'NONE';
+  validateTeamMode(format, teamMode);
   return prisma.tournament.create({
     data: {
       name: data.name,
@@ -104,7 +96,7 @@ export async function createTournament(data: {
       bestOfFormat,
       totalRounds: data.totalRounds ?? 0,
       teamMode,
-      teamSetupTiming: normalizeTeamSetupTiming(teamMode, data.teamSetupTiming),
+      teamSetupTiming: normalizeTeamSetupTiming(data.teamSetupTiming),
     },
   });
 }
@@ -129,15 +121,21 @@ export async function getTournament(id: string) {
       },
       standings: { include: { tournamentPlayer: true }, orderBy: { rank: 'asc' } },
       teams: {
-        orderBy: { name: 'asc' },
         include: {
           members: {
-            include: { tournamentPlayer: true },
-            orderBy: { slot: 'asc' },
+            include: {
+              tournamentPlayer: {
+                include: { player: { select: { avatarUrl: true } } },
+              },
+            },
           },
         },
+        orderBy: { seed: 'asc' },
       },
-      teamStandings: { orderBy: { rank: 'asc' } },
+      teamStandings: {
+        include: { team: true },
+        orderBy: { rank: 'asc' },
+      },
     },
   });
 
@@ -159,8 +157,36 @@ export async function getTournament(id: string) {
     updatedAt: tournament.updatedAt.toISOString(),
     players: tournament.players.map(serializeEventPlayer),
     rounds: tournament.rounds.map(serializeRound),
-    teams: serializeTeams(tournament.teams),
-    teamStandings: tournament.teamStandings,
+    teams: tournament.teams.map((team: any) => ({
+      id: team.id,
+      name: team.name,
+      seed: team.seed,
+      members: team.members
+        .slice()
+        .sort((left: any, right: any) => left.seatOrder - right.seatOrder)
+        .map((member: any) => ({
+          id: member.id,
+          seatOrder: member.seatOrder,
+          tournamentPlayerId: member.tournamentPlayerId,
+          player: serializeEventPlayer(member.tournamentPlayer),
+        })),
+    })),
+    teamStandings: tournament.teamStandings.map((standing: any) => ({
+      id: standing.id,
+      rank: standing.rank,
+      matchPoints: standing.matchPoints,
+      roundWins: standing.roundWins,
+      roundLosses: standing.roundLosses,
+      roundDraws: standing.roundDraws,
+      boardWins: standing.boardWins,
+      boardLosses: standing.boardLosses,
+      boardDraws: standing.boardDraws,
+      team: {
+        id: standing.team.id,
+        name: standing.team.name,
+        seed: standing.team.seed,
+      },
+    })),
     standings: tournament.standings.map((standing: any) => ({
       id: standing.id,
       tournamentId: standing.tournamentId,
@@ -374,12 +400,12 @@ export async function updateTournament(
   if (data.format !== undefined && tournament.status === 'REGISTRATION')
     updateData.format = data.format;
   if (data.teamMode !== undefined && tournament.status === 'REGISTRATION') {
-    validateTeamMode({ teamMode: data.teamMode, teamSetupTiming: data.teamSetupTiming, format: (data.format ?? tournament.format) as string });
+    validateTeamMode((data.format ?? tournament.format) as string, data.teamMode);
     updateData.teamMode = data.teamMode;
-    updateData.teamSetupTiming = normalizeTeamSetupTiming(data.teamMode, data.teamSetupTiming);
+    updateData.teamSetupTiming = normalizeTeamSetupTiming(data.teamSetupTiming);
   } else if (data.teamSetupTiming !== undefined && tournament.status === 'REGISTRATION') {
-    validateTeamMode({ teamMode: (tournament as any).teamMode, teamSetupTiming: data.teamSetupTiming, format: (data.format ?? tournament.format) as string });
-    updateData.teamSetupTiming = normalizeTeamSetupTiming((tournament as any).teamMode, data.teamSetupTiming);
+    validateTeamMode((data.format ?? tournament.format) as string, (tournament as any).teamMode);
+    updateData.teamSetupTiming = normalizeTeamSetupTiming(data.teamSetupTiming);
   }
   if (data.totalRounds !== undefined && tournament.status === 'REGISTRATION')
     updateData.totalRounds = data.totalRounds;
@@ -397,7 +423,10 @@ export async function randomizeSeats(tournamentId: string) {
   });
   if (!tournament) throw new Error('Tournament not found');
   if (usesTeamDraftMode((tournament as any).teamMode)) {
-    await generateBalancedTeams(tournamentId);
+    if (usesBeforeDraftTeamSetup((tournament as any).teamSetupTiming ?? 'BEFORE_DRAFT')) {
+      return randomizeTeamDraftSeats(tournamentId);
+    }
+    return generateRandomTournamentTeams(tournamentId);
   }
 
   if (!usesDraftPodSeating(tournament.format)) {
@@ -434,8 +463,9 @@ export async function startTournament(tournamentId: string) {
   if (!tournament) throw new Error('Tournament not found');
   if (tournament.status !== 'REGISTRATION') throw new Error('Tournament already started');
   validateTournamentPlayerCount(tournament.format, tournament.players.length);
+  validateTeamMode(tournament.format, (tournament as any).teamMode, tournament.players.length);
   if (usesTeamDraftMode((tournament as any).teamMode)) {
-    await generateBalancedTeams(tournamentId);
+    await generateRandomTournamentTeams(tournamentId);
   }
 
   const totalRounds =
@@ -641,23 +671,22 @@ export async function finishTournament(tournamentId: string) {
 }
 
 export async function generateTournamentTeams(tournamentId: string) {
-  return generateBalancedTeams(tournamentId);
+  return generateRandomTournamentTeams(tournamentId);
 }
 
 export async function saveTournamentTeams(
   tournamentId: string,
-  assignments: Array<{ teamId: string; tournamentPlayerId: string; slot: number }>,
+  assignments: Array<{ teamSeed: number; tournamentPlayerId: string; seatOrder: number }>,
 ) {
-  return saveTeamAssignments(tournamentId, assignments);
+  return persistTournamentTeams(tournamentId, assignments);
 }
 
 export async function getTournamentTeamPayload(tournamentId: string) {
-  const tournament = await prisma.tournament.findUnique({
-    where: { id: tournamentId },
-    include: { teams: { include: { members: { include: { tournamentPlayer: true } } } }, teamStandings: true },
-  });
-  if (!tournament) throw new Error('Tournament not found');
-  return { teams: serializeTeams(tournament.teams), standings: tournament.teamStandings };
+  const [teams, teamStandings] = await Promise.all([
+    getTournamentTeams(tournamentId),
+    recalculateTeamStandings(tournamentId),
+  ]);
+  return { teams, teamStandings };
 }
 
 export async function deleteTournament(tournamentId: string) {
