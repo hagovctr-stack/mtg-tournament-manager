@@ -6,6 +6,7 @@ import * as svc from './tournamentService';
 import { getSession, requireRole } from './auth';
 import { getStandings, getStandingsAtRound } from './standingsService';
 import * as leagues from './leagueService';
+import * as events from './eventService';
 import { broadcast } from './websocket';
 
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -310,6 +311,46 @@ router.get(
   '/leagues/:id/standings',
   wrap(async (req, res) => {
     res.json(await leagues.getLeagueStandings(req.params.id, req.auth!));
+  }),
+);
+
+
+router.get(
+  '/events',
+  wrap(async (req, res) => {
+    res.json(await events.listEvents(req.auth!));
+  }),
+);
+
+router.post(
+  '/events',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
+  wrap(async (req, res) => {
+    res.status(201).json(await events.createEvent(req.body, req.auth!));
+  }),
+);
+
+router.get(
+  '/events/:id',
+  wrap(async (req, res) => {
+    const event = await events.getEvent(req.params.id, req.auth!);
+    if (!event) return res.status(404).json({ error: 'Not found' });
+    res.json(event);
+  }),
+);
+
+router.get(
+  '/events/:id/stages',
+  wrap(async (req, res) => {
+    res.json(await events.listEventStages(req.params.id, req.auth!));
+  }),
+);
+
+router.post(
+  '/stages/:id/advance',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
+  wrap(async (req, res) => {
+    res.json(await events.advanceStage(req.params.id, req.auth!));
   }),
 );
 

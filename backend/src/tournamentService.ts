@@ -122,6 +122,11 @@ export async function getTournament(id: string, auth?: AuthContext) {
     where: buildScopedWhere(id, auth),
     include: {
       league: true,
+      eventStage: {
+        include: {
+          event: true,
+        },
+      },
       players: {
         where: { active: true },
         orderBy: [{ seatNumber: 'asc' }, { id: 'asc' }],
@@ -183,6 +188,16 @@ export async function getTournament(id: string, auth?: AuthContext) {
           startsAt: tournament.league.startsAt.toISOString(),
           endsAt: tournament.league.endsAt.toISOString(),
           status: tournament.league.status,
+        }
+      : null,
+    eventStage: tournament.eventStage
+      ? {
+          id: tournament.eventStage.id,
+          name: tournament.eventStage.name,
+          kind: tournament.eventStage.kind,
+          sequence: tournament.eventStage.sequence,
+          eventId: tournament.eventStage.event.id,
+          eventName: tournament.eventStage.event.name,
         }
       : null,
     players: tournament.players.map(serializeEventPlayer),

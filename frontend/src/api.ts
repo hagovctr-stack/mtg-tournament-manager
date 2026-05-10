@@ -123,6 +123,11 @@ export const api = {
   deleteLeague: (id: string) => request<void>('DELETE', `/leagues/${id}`),
   getLeague: (id: string) => request<LeagueDetail>('GET', `/leagues/${id}`),
   getLeagueStandings: (id: string) => request<LeagueStanding[]>('GET', `/leagues/${id}/standings`),
+  listEvents: () => request<EventSummary[]>('GET', '/events'),
+  createEvent: (data: CreateEventInput) => request<EventDetail>('POST', '/events', data),
+  getEvent: (id: string) => request<EventDetail>('GET', `/events/${id}`),
+  getEventStages: (id: string) => request<EventStage[]>('GET', `/events/${id}/stages`),
+  advanceStage: (id: string) => request<EventDetail>('POST', `/stages/${id}/advance`),
 };
 
 export interface SessionUser {
@@ -213,11 +218,21 @@ export interface Tournament {
   _count?: { players: number };
 }
 
+export interface EventStageRef {
+  id: string;
+  name: string;
+  kind: string;
+  sequence: number;
+  eventId: string;
+  eventName: string;
+}
+
 export interface TournamentDetail extends Tournament {
   players: Player[];
   rounds: RoundDetail[];
   standings: Standing[];
   league: LeagueRef | null;
+  eventStage: EventStageRef | null;
 }
 
 export interface Player {
@@ -387,3 +402,64 @@ export interface CreateLeagueInput {
 }
 
 export interface UpdateLeagueInput extends Partial<CreateLeagueInput> {}
+
+export interface EventParticipant {
+  id: string;
+  seed: number;
+  playerId: string | null;
+  name: string;
+}
+
+export interface EventStageTournamentCard {
+  id: string;
+  name: string;
+  status: string;
+  format: string;
+  totalRounds: number;
+  currentRound: number;
+}
+
+export interface EventStage {
+  id: string;
+  name: string;
+  kind: string;
+  sequence: number;
+  status: string;
+  advancementCount: number | null;
+  advancementSourceStageId: string | null;
+  configJson: Record<string, unknown> | null;
+  tournament: EventStageTournamentCard | null;
+}
+
+export interface EventSummary {
+  id: string;
+  name: string;
+  template: string;
+  status: string;
+  participantCount: number;
+  createdAt: string;
+  updatedAt: string;
+  stages: EventStage[];
+}
+
+export interface EventDetail {
+  id: string;
+  name: string;
+  template: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  participants: EventParticipant[];
+  stages: EventStage[];
+}
+
+export interface CreateEventInput {
+  name: string;
+  template: 'single_pod_to_top8' | 'multi_pod_to_top8' | 'double_draft_then_top8';
+  format?: string;
+  bestOfFormat?: string;
+  podCount?: number;
+  topCutSize?: number;
+  stageRounds?: number;
+  participants?: Array<{ playerId?: string | null; name: string }>;
+}
