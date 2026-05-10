@@ -3,7 +3,29 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    @apply bg-stone-100;
+  }
+
   body {
-    @apply text-gray-900 antialiased;
+    font-family: 'Avenir Next', 'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', sans-serif;
+    @apply bg-stone-100 text-slate-900 antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family:
+      'Baskerville', 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino,
+      'Times New Roman', serif;
+  }
+
+  ::selection {
+    @apply bg-rose-200 text-slate-950;
   }
 }
