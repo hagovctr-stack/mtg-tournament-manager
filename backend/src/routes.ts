@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import multer from 'multer';
 import * as svc from './tournamentService';
+import { getSession, requireRole } from './auth';
 import { getStandings, getStandingsAtRound } from './standingsService';
 import { broadcast } from './websocket';
 
@@ -33,6 +34,13 @@ const wrap =
     fn(req, res).catch(next);
 
 router.get(
+  '/auth/session',
+  wrap(async (req, res) => {
+    res.json(await getSession(req.auth?.userId));
+  }),
+);
+
+router.get(
   '/tournaments',
   wrap(async (_req, res) => {
     res.json(await svc.listTournaments());
@@ -41,6 +49,7 @@ router.get(
 
 router.post(
   '/tournaments',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     res.status(201).json(await svc.createTournament(req.body));
   }),
@@ -57,6 +66,7 @@ router.get(
 
 router.post(
   '/tournaments/:id/start',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     const tournament = await svc.startTournament(req.params.id);
     broadcast(req.params.id, 'round_started', { tournamentId: req.params.id });
@@ -66,6 +76,7 @@ router.post(
 
 router.post(
   '/tournaments/:id/finish',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     const tournament = await svc.finishTournament(req.params.id);
     broadcast(req.params.id, 'tournament_finished', { tournamentId: req.params.id });
@@ -75,6 +86,7 @@ router.post(
 
 router.delete(
   '/tournaments/:id',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     res.json(await svc.deleteTournament(req.params.id));
   }),
@@ -82,6 +94,7 @@ router.delete(
 
 router.patch(
   '/tournaments/:id',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     const t = await svc.updateTournament(req.params.id, req.body);
     res.json(t);
@@ -90,6 +103,7 @@ router.patch(
 
 router.post(
   '/tournaments/:id/randomize-seats',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     await svc.randomizeSeats(req.params.id);
     const tournament = await svc.getTournament(req.params.id);
@@ -106,6 +120,7 @@ router.get(
 
 router.post(
   '/players',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     try {
       res.status(201).json(await svc.createPlayer(req.body, req.query.force === 'true'));
@@ -117,6 +132,7 @@ router.post(
 
 router.post(
   '/tournaments/:id/players',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     res.status(201).json(await svc.addPlayer(req.params.id, req.body));
   }),
@@ -124,6 +140,7 @@ router.post(
 
 router.delete(
   '/players/:id',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     res.json(await svc.dropPlayer(req.params.id));
   }),
@@ -131,6 +148,7 @@ router.delete(
 
 router.delete(
   '/players/:id/profile',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     try {
       res.json(await svc.deleteGlobalPlayer(req.params.id));
@@ -143,6 +161,7 @@ router.delete(
 router.post(
   '/players/:id/avatar',
   avatarUpload.single('avatar'),
+  requireRole('ORG_ADMIN', 'ORGANIZER', 'PLAYER'),
   wrap(async (req, res) => {
     if (!req.file)
       return res
@@ -165,6 +184,7 @@ router.get(
 
 router.post(
   '/tournaments/:id/rounds',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     const round = await svc.generateNextRound(req.params.id);
     broadcast(req.params.id, 'pairings_updated', round);
@@ -175,6 +195,7 @@ router.post(
 
 router.patch(
   '/matches/:id/result',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     const match = await svc.reportResult(req.params.id, req.body);
     broadcast(match!.tournamentId, 'result_reported', { match });

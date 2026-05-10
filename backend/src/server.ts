@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import { initWebSocket } from './websocket';
 import router from './routes';
 import { openApiDocument } from './openapi';
+import { attachAuthContext, ensureDefaultOrganization } from './auth';
 
 const app = express();
 const httpServer = createServer(app);
@@ -50,6 +51,7 @@ app.use(
   }),
 );
 app.use(express.json());
+app.use(attachAuthContext);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 initWebSocket(httpServer);
@@ -59,8 +61,14 @@ app.use('/api', router);
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
-httpServer.listen(PORT, () => {
-  console.log(`[server] Running on http://localhost:${PORT}`);
-});
+ensureDefaultOrganization()
+  .catch((error) => {
+    console.error('[auth bootstrap]', error);
+  })
+  .finally(() => {
+    httpServer.listen(PORT, () => {
+      console.log(`[server] Running on http://localhost:${PORT}`);
+    });
+  });
 
 export default app;

@@ -1,4 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api';
+const AUTH_USER_STORAGE_KEY = 'mtg-auth-user-id';
 
 class ApiError extends Error {
   code?: string;
@@ -8,24 +9,67 @@ class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+function getAuthHeaders(extra?: HeadersInit) {
+  const headers = new Headers(extra);
+  const userId = localStorage.getItem(AUTH_USER_STORAGE_KEY);
+  if (userId) headers.set('x-user-id', userId);
+  return headers;
+}
+
+function toQuery(params?: Record<string, string | number | null | undefined>) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value !== undefined && value !== null && value !== '') {
+      search.set(key, String(value));
+    }
+  }
+  const value = search.toString();
+  return value ? `?${value}` : '';
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  init?: { headers?: HeadersInit },
+): Promise<T> {
+  const headers = getAuthHeaders(init?.headers);
+  if (body !== undefined) headers.set('Content-Type', 'application/json');
+
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new ApiError(err.error ?? 'Request failed', err.code);
   }
+  if (res.status === 204 || res.headers.get('content-length') === '0') {
+    return undefined as T;
+  }
   return res.json();
 }
 
+export function getStoredUserId() {
+  return localStorage.getItem(AUTH_USER_STORAGE_KEY);
+}
+
+export function setStoredUserId(userId: string | null) {
+  if (userId) localStorage.setItem(AUTH_USER_STORAGE_KEY, userId);
+  else localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+}
+
 export const api = {
+  getSession: () => request<AuthSession>('GET', '/auth/session'),
   listTournaments: () => request<Tournament[]>('GET', '/tournaments'),
   listPlayers: () => request<PlayerListItem[]>('GET', '/players'),
   createPlayer: (data: AddPlayerInput, force = false) =>
-    request<PlayerListItem>('POST', `/players${force ? '?force=true' : ''}`, data),
+    request<PlayerListItem>(
+      'POST',
+      `/players${toQuery({ force: force ? 'true' : undefined })}`,
+      data,
+    ),
   createTournament: (data: CreateTournamentInput) =>
     request<Tournament>('POST', '/tournaments', data),
   getTournament: (id: string) => request<TournamentDetail>('GET', `/tournaments/${id}`),
@@ -41,15 +85,17 @@ export const api = {
   uploadPlayerAvatar: (playerId: string, file: File) => {
     const form = new FormData();
     form.append('avatar', file);
-    return fetch(`${BASE_URL}/players/${playerId}/avatar`, { method: 'POST', body: form }).then(
-      async (res) => {
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: res.statusText }));
-          throw new ApiError(err.error ?? 'Upload failed', err.code);
-        }
-        return res.json() as Promise<PlayerListItem>;
-      },
-    );
+    return fetch(`${BASE_URL}/players/${playerId}/avatar`, {
+      method: 'POST',
+      body: form,
+      headers: getAuthHeaders(),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new ApiError(err.error ?? 'Upload failed', err.code);
+      }
+      return res.json() as Promise<PlayerListItem>;
+    });
   },
   getPlayerSummary: (playerId: string) =>
     request<PlayerSummary>('GET', `/players/${playerId}/summary`),
@@ -60,7 +106,7 @@ export const api = {
   getStandings: (tournamentId: string, round?: number) =>
     request<Standing[]>(
       'GET',
-      `/tournaments/${tournamentId}/standings${round !== undefined ? `?round=${round}` : ''}`,
+      `/tournaments/${tournamentId}/standings${toQuery({ round: round ?? undefined })}`,
     ),
   updateTournament: (id: string, data: UpdateTournamentInput) =>
     request<Tournament>('PATCH', `/tournaments/${id}`, data),
@@ -70,6 +116,26 @@ export const api = {
     window.open(`${BASE_URL}/tournaments/${tournamentId}/export`, '_blank');
   },
 };
+
+export interface SessionUser {
+  userId: string;
+  name: string;
+  email: string;
+  role: OrganizationRole;
+  organizationId: string;
+  organizationName: string;
+}
+
+export interface AuthSession {
+  organizationId: string | null;
+  organizationSlug: string | null;
+  userId: string | null;
+  userName: string | null;
+  role: OrganizationRole;
+  users: SessionUser[];
+}
+
+export type OrganizationRole = 'ORG_ADMIN' | 'ORGANIZER' | 'PLAYER';
 
 export interface PlayerStats {
   tournamentsPlayed: number;
