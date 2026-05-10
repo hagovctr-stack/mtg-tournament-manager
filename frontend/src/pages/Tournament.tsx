@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   api,
@@ -260,6 +261,8 @@ export function Tournament() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showEdit, setShowEdit] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [editName, setEditName] = useState('');
   const [editFormat, setEditFormat] = useState('');
   const [editSubtitle, setEditSubtitle] = useState('');
@@ -452,14 +455,16 @@ export function Tournament() {
   };
 
   const deleteTournament = async () => {
-    if (!id || !confirm(`Delete ${tournament.name}?`)) return;
-    setLoading(true);
+    if (!id) return;
+    setDeleting(true);
     try {
       await api.deleteTournament(id);
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error deleting tournament');
-      setLoading(false);
+      setShowDeleteConfirm(false);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -545,7 +550,7 @@ export function Tournament() {
                   </svg>
                 </button>
                 <button
-                  onClick={() => void deleteTournament()}
+                  onClick={() => setShowDeleteConfirm(true)}
                   title="Delete tournament"
                   className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700 transition hover:bg-red-100"
                 >
@@ -569,6 +574,38 @@ export function Tournament() {
           </>
         }
       />
+
+      {showDeleteConfirm &&
+        createPortal(
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-[1.75rem] border border-red-200 bg-white p-7 shadow-[0_32px_80px_rgba(15,23,42,0.22)]">
+              <h2 className="font-serif text-xl font-semibold text-slate-950">
+                Delete tournament?
+              </h2>
+              <p className="mt-2 text-sm text-slate-600">
+                This will permanently delete <strong>{tournament.name}</strong> and cannot be
+                undone.
+              </p>
+              <div className="mt-6 flex items-center gap-3">
+                <button
+                  onClick={() => void deleteTournament()}
+                  disabled={deleting}
+                  className="rounded-2xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting…' : 'Yes, delete'}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleting}
+                  className="rounded-2xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {tournament.status === 'ACTIVE' && (
         <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

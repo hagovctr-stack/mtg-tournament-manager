@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, type League, type PlayerSummary, type PlayerTournamentHistoryEntry } from '../api';
 import { useAuth } from '../auth';
@@ -363,33 +364,35 @@ export function PlayerHistory() {
       )}
 
       {/* Delete confirmation dialog */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-[1.75rem] border border-red-200 bg-white p-7 shadow-[0_32px_80px_rgba(15,23,42,0.22)]">
-            <h2 className="font-serif text-xl font-semibold text-slate-950">Delete player?</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              This will permanently delete <strong>{summary.name}</strong> and cannot be undone.
-              Players with tournament history cannot be deleted.
-            </p>
-            <div className="mt-6 flex items-center gap-3">
-              <button
-                onClick={() => void confirmDelete()}
-                disabled={deleting}
-                className="rounded-2xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
-              >
-                {deleting ? 'Deleting…' : 'Yes, delete'}
-              </button>
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={deleting}
-                className="rounded-2xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-              >
-                Cancel
-              </button>
+      {showDeleteConfirm &&
+        createPortal(
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-[1.75rem] border border-red-200 bg-white p-7 shadow-[0_32px_80px_rgba(15,23,42,0.22)]">
+              <h2 className="font-serif text-xl font-semibold text-slate-950">Delete player?</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                This will permanently delete <strong>{summary.name}</strong> and cannot be undone.
+                Players with tournament history cannot be deleted.
+              </p>
+              <div className="mt-6 flex items-center gap-3">
+                <button
+                  onClick={() => void confirmDelete()}
+                  disabled={deleting}
+                  className="rounded-2xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting…' : 'Yes, delete'}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleting}
+                  className="rounded-2xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {/* Row 1 */}
