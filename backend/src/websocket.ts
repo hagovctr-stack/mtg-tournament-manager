@@ -6,6 +6,7 @@ export type WsEvent =
   | 'standings_updated'
   | 'result_reported'
   | 'round_started'
+  | 'tournament_updated'
   | 'timer_update'
   | 'tournament_finished';
 

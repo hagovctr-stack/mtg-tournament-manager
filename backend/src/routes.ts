@@ -205,6 +205,26 @@ router.patch(
   }),
 );
 
+router.post(
+  '/tournaments/:id/teams/generate',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
+  wrap(async (req, res) => {
+    const payload = await svc.generateTournamentTeams(req.params.id);
+    broadcast(req.params.id, 'tournament_updated', { tournamentId: req.params.id });
+    res.json(payload);
+  }),
+);
+
+router.patch(
+  '/tournaments/:id/teams',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
+  wrap(async (req, res) => {
+    const payload = await svc.saveTournamentTeams(req.params.id, req.body.assignments ?? []);
+    broadcast(req.params.id, 'tournament_updated', { tournamentId: req.params.id });
+    res.json(payload);
+  }),
+);
+
 router.get(
   '/tournaments/:id/standings',
   wrap(async (req, res) => {
