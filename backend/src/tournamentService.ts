@@ -60,6 +60,24 @@ function normalizeTeamSetupTiming(teamSetupTiming?: string) {
   return teamSetupTiming === 'AFTER_DRAFT' ? 'AFTER_DRAFT' : 'BEFORE_DRAFT';
 }
 
+export function validateTournamentPlanUpdate(
+  tournament: { status: string; totalRounds: number; currentRound: number },
+  existingRoundCount: number,
+  nextTotalRounds: number,
+) {
+  if (!Number.isInteger(nextTotalRounds) || nextTotalRounds < 1) {
+    throw new Error('Total rounds must be an integer greater than or equal to 1');
+  }
+  if (tournament.status === 'FINISHED') {
+    throw new Error('Cannot edit rounds after tournament finalization');
+  }
+  if (tournament.status === 'ACTIVE') {
+    if (nextTotalRounds < existingRoundCount || nextTotalRounds < tournament.currentRound) {
+      throw new Error('Cannot reduce rounds below the rounds already created');
+    }
+  }
+}
+
 export function canEditTournamentResults(status: string) {
   return status === 'ACTIVE' || status === 'FINISHED';
 }
@@ -473,6 +491,7 @@ export async function updateTournament(
 ) {
   const tournament = await prisma.tournament.findFirst({ where: buildScopedWhere(id, auth) });
   if (!tournament) throw new Error('Tournament not found');
+  const existingRoundCount = await prisma.round.count({ where: { tournamentId: id } });
 
   const updateData: Record<string, unknown> = {};
   if (data.name !== undefined) updateData.name = data.name.trim();
@@ -481,18 +500,25 @@ export async function updateTournament(
   if ('leagueId' in data) updateData.leagueId = data.leagueId ?? null;
   if (data.format !== undefined && tournament.status === 'REGISTRATION')
     updateData.format = data.format;
-  if (data.teamMode !== undefined && tournament.status === 'REGISTRATION') {
-    validateTeamMode((data.format ?? tournament.format) as string, data.teamMode);
-    updateData.teamMode = data.teamMode;
-    updateData.teamSetupTiming = normalizeTeamSetupTiming(data.teamSetupTiming);
-  } else if (data.teamSetupTiming !== undefined && tournament.status === 'REGISTRATION') {
-    validateTeamMode((data.format ?? tournament.format) as string, (tournament as any).teamMode);
+  if (data.teamMode !== undefined) {
+    if (tournament.status !== 'REGISTRATION') {
+      throw new Error('Team mode must be configured before the tournament starts');
+    }
+    validateTeamMode(data.format ?? tournament.format, data.teamMode);
+    updateData.teamMode = data.teamMode === 'TEAM_DRAFT_3V3' ? 'TEAM_DRAFT_3V3' : 'NONE';
+  }
+  if (data.teamSetupTiming !== undefined) {
+    if (tournament.status !== 'REGISTRATION') {
+      throw new Error('Team setup timing must be configured before the tournament starts');
+    }
     updateData.teamSetupTiming = normalizeTeamSetupTiming(data.teamSetupTiming);
   }
-  if (data.totalRounds !== undefined && tournament.status === 'REGISTRATION')
+  if (data.totalRounds !== undefined) {
+    validateTournamentPlanUpdate(tournament, existingRoundCount, data.totalRounds);
     updateData.totalRounds = data.totalRounds;
+  }
 
-  return prisma.tournament.update({ where: { id }, data: updateData });
+  return prisma.tournament.update({ where: { id }, data: updateData as any });
 }
 
 export async function randomizeSeats(tournamentId: string) {
@@ -557,7 +583,7 @@ export async function startTournament(tournamentId: string) {
 
   return prisma.tournament.update({
     where: { id: tournamentId },
-    data: { status: 'ACTIVE', totalRounds },
+    data: { status: 'ACTIVE', totalRounds, startedAt: new Date() },
   });
 }
 
@@ -753,7 +779,7 @@ export async function finishTournament(tournamentId: string) {
     await syncTournamentEloToPlayerRatings(tournamentId, tx);
     return tx.tournament.update({
       where: { id: tournamentId },
-      data: { status: 'FINISHED' },
+      data: { status: 'FINISHED', finishedAt: new Date() },
     });
   });
 }

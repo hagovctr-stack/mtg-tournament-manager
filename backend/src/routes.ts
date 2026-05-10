@@ -71,6 +71,7 @@ router.post(
   requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     const tournament = await svc.startTournament(req.params.id);
+    broadcast(req.params.id, 'tournament_updated', { tournamentId: req.params.id });
     broadcast(req.params.id, 'round_started', { tournamentId: req.params.id });
     res.json(tournament);
   }),
@@ -81,6 +82,7 @@ router.post(
   requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     const tournament = await svc.finishTournament(req.params.id);
+    broadcast(req.params.id, 'tournament_updated', { tournamentId: req.params.id });
     broadcast(req.params.id, 'tournament_finished', { tournamentId: req.params.id });
     res.json(tournament);
   }),
@@ -99,6 +101,7 @@ router.patch(
   requireRole('ORG_ADMIN', 'ORGANIZER'),
   wrap(async (req, res) => {
     const t = await svc.updateTournament(req.params.id, req.body, req.auth);
+    broadcast(req.params.id, 'tournament_updated', { tournamentId: req.params.id, tournament: t });
     res.json(t);
   }),
 );
@@ -109,6 +112,7 @@ router.post(
   wrap(async (req, res) => {
     await svc.randomizeSeats(req.params.id);
     const tournament = await svc.getTournament(req.params.id, req.auth);
+    broadcast(req.params.id, 'tournament_updated', { tournamentId: req.params.id, tournament });
     res.json(tournament);
   }),
 );
