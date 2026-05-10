@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeLeagueWindow } from '../src/leagueService';
+import { canEditTournamentResults } from '../src/tournamentService';
 
 describe('normalizeLeagueWindow', () => {
   it('normalizes the date range to start and end of day boundaries', () => {
@@ -17,5 +18,17 @@ describe('normalizeLeagueWindow', () => {
     expect(() => normalizeLeagueWindow('2026-04-10', '2026-04-01')).toThrow(
       /League start date must be on or before the end date/,
     );
+  });
+});
+
+
+describe('canEditTournamentResults', () => {
+  it('allows corrections while a tournament is active or finished', () => {
+    expect(canEditTournamentResults('ACTIVE')).toBe(true);
+    expect(canEditTournamentResults('FINISHED')).toBe(true);
+  });
+
+  it('rejects result edits before the tournament starts', () => {
+    expect(canEditTournamentResults('REGISTRATION')).toBe(false);
   });
 });

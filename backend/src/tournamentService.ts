@@ -60,6 +60,10 @@ function normalizeTeamSetupTiming(teamSetupTiming?: string) {
   return teamSetupTiming === 'AFTER_DRAFT' ? 'AFTER_DRAFT' : 'BEFORE_DRAFT';
 }
 
+export function canEditTournamentResults(status: string) {
+  return status === 'ACTIVE' || status === 'FINISHED';
+}
+
 function validateResult(wins1: number, wins2: number, format: BestOfFormat): void {
   if (!Number.isInteger(wins1) || !Number.isInteger(wins2) || wins1 < 0 || wins2 < 0) {
     throw new Error('Wins must be non-negative integers');
@@ -681,9 +685,12 @@ export async function reportResult(
     select: { bestOfFormat: true, status: true, teamMode: true },
   });
   if (!tournament) throw new Error('Tournament not found');
-  if (tournament.status === 'FINISHED') throw new Error('Tournament already finished');
+  if (!canEditTournamentResults(tournament.status)) {
+    throw new Error('Tournament is not accepting results');
+  }
   const bestOfFormat = tournament.bestOfFormat as BestOfFormat;
   validateResult(data.wins1, data.wins2, bestOfFormat);
+  const originalRoundFinishedAt = match.round.finishedAt;
 
   // If the round was already closed, reopen it so the edit is valid
   if (match.round.status === 'FINISHED') {
@@ -711,15 +718,18 @@ export async function reportResult(
   if (pendingMatches === 0) {
     await prisma.round.update({
       where: { id: match.roundId },
-      data: { status: 'FINISHED', finishedAt: new Date() },
+      data: { status: 'FINISHED', finishedAt: originalRoundFinishedAt ?? new Date() },
     });
   }
 
   await recalculateStandings(match.tournamentId);
+  await recalculateTournamentElo(match.tournamentId);
+  if (tournament.status === 'FINISHED') {
+    await syncTournamentEloToPlayerRatings(match.tournamentId);
+  }
   if (usesTeamDraftMode((tournament as any).teamMode)) {
     await recalculateTeamStandings(match.tournamentId);
   }
-  await recalculateTournamentElo(match.tournamentId);
 
   const persistedMatch = await prisma.match.findUnique({
     where: { id: matchId },
