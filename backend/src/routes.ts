@@ -115,7 +115,9 @@ router.post(
 router.get(
   '/players',
   wrap(async (req, res) => {
-    res.json(await svc.listPlayers(req.auth));
+    res.json(
+      await svc.listPlayers(req.auth, { leagueId: req.query.leagueId as string | undefined }),
+    );
   }),
 );
 
@@ -177,7 +179,9 @@ router.post(
 router.get(
   '/players/:id/summary',
   wrap(async (req, res) => {
-    const player = await svc.getPlayerSummary(req.params.id);
+    const player = await svc.getPlayerSummary(req.params.id, req.auth, {
+      leagueId: req.query.leagueId as string | undefined,
+    });
     if (!player) return res.status(404).json({ error: 'Not found' });
     res.json(player);
   }),
@@ -298,6 +302,14 @@ router.delete(
   wrap(async (req, res) => {
     await leagues.deleteLeague(req.params.id, req.auth!);
     res.status(204).end();
+  }),
+);
+
+
+router.get(
+  '/leagues/:id/standings',
+  wrap(async (req, res) => {
+    res.json(await leagues.getLeagueStandings(req.params.id, req.auth!));
   }),
 );
 

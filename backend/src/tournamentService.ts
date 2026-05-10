@@ -760,8 +760,11 @@ export async function deleteTournament(tournamentId: string) {
   return tournament;
 }
 
-function buildPlayerStats(registrations: any[]) {
-  const totals = registrations.reduce(
+function buildPlayerStats(registrations: any[], leagueId?: string) {
+  const filteredRegistrations = leagueId
+    ? registrations.filter((registration) => registration.tournament.leagueId === leagueId)
+    : registrations;
+  const totals = filteredRegistrations.reduce(
     (acc: any, registration: any) => {
       acc.tournamentsPlayed += 1;
       if (registration.active) acc.activeRegistrations += 1;
@@ -812,7 +815,11 @@ function buildPlayerStats(registrations: any[]) {
       totals.gameWins + totals.gameLosses + totals.gameDraws > 0
         ? totals.gameWins / (totals.gameWins + totals.gameLosses + totals.gameDraws)
         : 0,
-    lastTournamentAt: registrations[0]?.tournament.createdAt.toISOString() ?? null,
+    lastTournamentAt:
+      filteredRegistrations[0]?.tournament.finishedAt?.toISOString() ??
+      filteredRegistrations[0]?.tournament.startedAt?.toISOString() ??
+      filteredRegistrations[0]?.tournament.createdAt.toISOString() ??
+      null,
   };
 }
 
@@ -842,7 +849,12 @@ function serializePlayerTournamentHistoryEntry(registration: any) {
     tournamentPlayerId: registration.id,
     name: registration.tournament.name,
     status: registration.tournament.status,
-    playedAt: registration.tournament.createdAt.toISOString(),
+    leagueId: registration.tournament.leagueId ?? null,
+    leagueName: registration.tournament.league?.name ?? null,
+    playedAt:
+      registration.tournament.finishedAt?.toISOString() ??
+      registration.tournament.startedAt?.toISOString() ??
+      registration.tournament.createdAt.toISOString(),
     displayName: registration.displayName,
     displayDciNumber: registration.displayDciNumber,
     startingElo: registration.startingElo,
@@ -856,25 +868,30 @@ function serializePlayerTournamentHistoryEntry(registration: any) {
     matchDraws: registration.standing?.matchDraws ?? 0,
     earnedTrophy: trophyOutcome.regularTrophy,
     earnedTeamDraftTrophy: trophyOutcome.teamDraftTrophy,
+    format: registration.tournament.format,
   };
 }
 
-function serializeGlobalPlayerSummary(player: any) {
-  const registrations = player.tournaments ?? [];
+function serializeGlobalPlayerSummary(player: any, leagueId?: string) {
+  const registrations = leagueId
+    ? (player.tournaments ?? []).filter(
+        (registration: any) => registration.tournament.leagueId === leagueId,
+      )
+    : (player.tournaments ?? []);
   return {
     ...serializeGlobalPlayerBase(player),
-    stats: buildPlayerStats(registrations),
+    stats: buildPlayerStats(player.tournaments ?? [], leagueId),
     tournaments: registrations.map(serializePlayerTournamentHistoryEntry),
   };
 }
 
-export async function listPlayers(auth?: AuthContext) {
+export async function listPlayers(auth?: AuthContext, options?: { leagueId?: string }) {
   const players = await prisma.player.findMany({
     where: buildScopedListWhere(auth),
     include: {
       tournaments: {
         include: {
-          tournament: true,
+          tournament: { include: { league: true } },
           standing: true,
           teamMembership: {
             include: {
@@ -897,7 +914,7 @@ export async function listPlayers(auth?: AuthContext) {
   });
 
   return players.map((player: any) => {
-    const summary = serializeGlobalPlayerSummary(player);
+    const summary = serializeGlobalPlayerSummary(player, options?.leagueId);
     return {
       ...serializeGlobalPlayerBase(player),
       stats: summary.stats,
@@ -905,7 +922,11 @@ export async function listPlayers(auth?: AuthContext) {
   });
 }
 
-export async function getPlayerSummary(playerId: string, auth?: AuthContext) {
+export async function getPlayerSummary(
+  playerId: string,
+  auth?: AuthContext,
+  options?: { leagueId?: string },
+) {
   const player = await prisma.player.findFirst({
     where: auth?.organizationId
       ? { id: playerId, organizationId: auth.organizationId }
@@ -913,7 +934,7 @@ export async function getPlayerSummary(playerId: string, auth?: AuthContext) {
     include: {
       tournaments: {
         include: {
-          tournament: true,
+          tournament: { include: { league: true } },
           standing: true,
           teamMembership: {
             include: {
@@ -936,7 +957,7 @@ export async function getPlayerSummary(playerId: string, auth?: AuthContext) {
 
   if (!player) return null;
 
-  return serializeGlobalPlayerSummary(player);
+  return serializeGlobalPlayerSummary(player, options?.leagueId);
 }
 
 export async function buildPlayerStates(tournamentId: string): Promise<PlayerState[]> {

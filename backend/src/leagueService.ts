@@ -1,5 +1,6 @@
 import { prisma } from './db';
 import type { AuthContext } from './auth';
+import { evaluateTrophyOutcome, getTeamRankFromMembership } from './trophyService';
 
 function startOfDay(value: string | Date) {
   const date = new Date(value);
@@ -169,4 +170,116 @@ export async function updateLeague(
   });
 
   return serializeLeague(updated);
+}
+
+export async function getLeagueStandings(id: string, auth: AuthContext) {
+  const league = await prisma.league.findFirst({
+    where: { id, organizationId: auth.organizationId ?? undefined },
+    include: {
+      tournaments: {
+        include: {
+          standings: {
+            include: {
+              tournamentPlayer: {
+                include: {
+                  player: true,
+                  teamMembership: {
+                    include: {
+                      team: {
+                        include: {
+                          standings: {
+                            select: { rank: true },
+                            orderBy: { rank: 'asc' },
+                            take: 1,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!league) throw new Error('League not found');
+
+  const totals = new Map<string, any>();
+
+  for (const tournament of league.tournaments) {
+    for (const standing of tournament.standings) {
+      const player = standing.tournamentPlayer.player;
+      const key = player?.id ?? `registration:${standing.tournamentPlayerId}`;
+      const existing = totals.get(key) ?? {
+        key,
+        playerId: player?.id ?? null,
+        name: standing.tournamentPlayer.displayName,
+        avatarUrl: player?.avatarUrl ?? null,
+        rating: player?.rating ?? standing.tournamentPlayer.currentElo,
+        tournamentsPlayed: 0,
+        trophies: 0,
+        teamDraftTrophies: 0,
+        matchPoints: 0,
+        matchWins: 0,
+        matchLosses: 0,
+        matchDraws: 0,
+        gameWins: 0,
+        gameLosses: 0,
+        gameDraws: 0,
+        lastPlayedAt: null as string | null,
+      };
+
+      existing.tournamentsPlayed += 1;
+      existing.matchPoints += standing.matchPoints;
+      existing.matchWins += standing.matchWins;
+      existing.matchLosses += standing.matchLosses;
+      existing.matchDraws += standing.matchDraws;
+      existing.gameWins += standing.gameWins;
+      existing.gameLosses += standing.gameLosses;
+      existing.gameDraws += standing.gameDraws;
+      const trophyOutcome = evaluateTrophyOutcome({
+        tournamentStatus: tournament.status,
+        teamMode: tournament.teamMode,
+        individualRank: standing.rank,
+        teamRank: getTeamRankFromMembership(standing.tournamentPlayer.teamMembership),
+      });
+      if (trophyOutcome.regularTrophy) {
+        existing.trophies += 1;
+      }
+      if (trophyOutcome.teamDraftTrophy) {
+        existing.teamDraftTrophies += 1;
+      }
+      const playedAt = (
+        tournament.finishedAt ??
+        tournament.startedAt ??
+        tournament.createdAt
+      ).toISOString();
+      if (!existing.lastPlayedAt || existing.lastPlayedAt < playedAt) {
+        existing.lastPlayedAt = playedAt;
+      }
+      totals.set(key, existing);
+    }
+  }
+
+  return [...totals.values()]
+    .sort((left, right) => {
+      if (left.matchPoints !== right.matchPoints) return right.matchPoints - left.matchPoints;
+      if (left.trophies !== right.trophies) return right.trophies - left.trophies;
+      if (left.teamDraftTrophies !== right.teamDraftTrophies) {
+        return right.teamDraftTrophies - left.teamDraftTrophies;
+      }
+      if (left.matchWins !== right.matchWins) return right.matchWins - left.matchWins;
+      return left.name.localeCompare(right.name);
+    })
+    .map((entry, index) => ({
+      rank: index + 1,
+      ...entry,
+      matchWinRate:
+        entry.matchWins + entry.matchLosses + entry.matchDraws > 0
+          ? entry.matchWins / (entry.matchWins + entry.matchLosses + entry.matchDraws)
+          : 0,
+    }));
 }

@@ -63,7 +63,8 @@ export function setStoredUserId(userId: string | null) {
 export const api = {
   getSession: () => request<AuthSession>('GET', '/auth/session'),
   listTournaments: () => request<Tournament[]>('GET', '/tournaments'),
-  listPlayers: () => request<PlayerListItem[]>('GET', '/players'),
+  listPlayers: (leagueId?: string) =>
+    request<PlayerListItem[]>('GET', `/players${toQuery({ leagueId })}`),
   createPlayer: (data: AddPlayerInput, force = false) =>
     request<PlayerListItem>(
       'POST',
@@ -97,8 +98,8 @@ export const api = {
       return res.json() as Promise<PlayerListItem>;
     });
   },
-  getPlayerSummary: (playerId: string) =>
-    request<PlayerSummary>('GET', `/players/${playerId}/summary`),
+  getPlayerSummary: (playerId: string, leagueId?: string) =>
+    request<PlayerSummary>('GET', `/players/${playerId}/summary${toQuery({ leagueId })}`),
   generateRound: (tournamentId: string) =>
     request<Round>('POST', `/tournaments/${tournamentId}/rounds`),
   reportResult: (matchId: string, data: ReportResultInput) =>
@@ -121,6 +122,7 @@ export const api = {
     request<League>('PATCH', `/leagues/${id}`, data),
   deleteLeague: (id: string) => request<void>('DELETE', `/leagues/${id}`),
   getLeague: (id: string) => request<LeagueDetail>('GET', `/leagues/${id}`),
+  getLeagueStandings: (id: string) => request<LeagueStanding[]>('GET', `/leagues/${id}/standings`),
 };
 
 export interface SessionUser {
@@ -180,6 +182,7 @@ export interface PlayerTournamentHistoryEntry {
   earnedTeamDraftTrophy: boolean;
   leagueId: string | null;
   leagueName: string | null;
+  format: string;
 }
 
 export interface LeagueRef {
@@ -351,6 +354,29 @@ export interface LeagueTournamentCard {
 
 export interface LeagueDetail extends League {
   tournaments: LeagueTournamentCard[];
+}
+
+
+
+export interface LeagueStanding {
+  rank: number;
+  key: string;
+  playerId: string | null;
+  name: string;
+  avatarUrl: string | null;
+  rating: number;
+  tournamentsPlayed: number;
+  trophies: number;
+  teamDraftTrophies: number;
+  matchPoints: number;
+  matchWins: number;
+  matchLosses: number;
+  matchDraws: number;
+  gameWins: number;
+  gameLosses: number;
+  gameDraws: number;
+  lastPlayedAt: string | null;
+  matchWinRate: number;
 }
 
 export interface CreateLeagueInput {
