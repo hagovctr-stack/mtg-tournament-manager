@@ -5,6 +5,8 @@ import { Tournament } from './pages/Tournament';
 import { Pairings } from './pages/Pairings';
 import { Standings } from './pages/Standings';
 import { PlayerHistory } from './pages/PlayerHistory';
+import { LeaguePage } from './pages/LeaguePage';
+import { EventPage } from './pages/EventPage';
 
 export default function App() {
   return (
@@ -16,6 +18,8 @@ export default function App() {
         <Route path="/leagues" element={<Home />} />
         <Route path="/events" element={<Home />} />
         <Route path="/players/:id" element={<PlayerHistory />} />
+        <Route path="/leagues/:id" element={<LeaguePage />} />
+        <Route path="/events/:id" element={<EventPage />} />
         <Route path="/tournament/:id" element={<Tournament />} />
         <Route path="/tournament/:id/pairings" element={<Pairings />} />
         <Route path="/tournament/:id/standings" element={<Standings />} />

@@ -1,47 +1,290 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { api, type TournamentDetail, type RoundDetail } from '../api';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  api,
+  TournamentDetail,
+  RoundDetail,
+  League,
+  Player,
+  TournamentTeam,
+  TeamMode,
+  TeamSetupTiming,
+} from '../api';
+import { useAuth } from '../auth';
+import { getSocket, joinTournament } from '../socket';
+import { PageHeader } from '../components/PageHeader';
+import { DraftPod } from '../components/DraftPod';
 import { PlayerList } from '../components/PlayerList';
 import { PairingsTable } from '../components/PairingsTable';
 import { StandingsTable } from '../components/StandingsTable';
+import { RoundSelector } from '../components/RoundSelector';
 import { Timer } from '../components/Timer';
-import { DraftPod } from '../components/DraftPod';
-import { joinTournament, getSocket } from '../socket';
 
 type Tab = 'players' | 'pairings' | 'standings';
+
+const TEAM_EDITOR_SEEDS = [1, 2];
+
+function buildInitialTeamSlots(players: Player[], teams: TournamentTeam[]) {
+  const assigned = new Map<string, string | null>();
+
+  if (teams.length === 2 && teams.every((team) => team.members.length === 3)) {
+    for (const team of teams) {
+      for (const member of team.members) {
+        assigned.set(`${team.seed}-${member.seatOrder}`, member.tournamentPlayerId);
+      }
+    }
+  } else {
+    const orderedPlayers = sortPlayersForTeamEditor(players);
+    for (const teamSeed of TEAM_EDITOR_SEEDS) {
+      for (let seatOrder = 1; seatOrder <= 3; seatOrder += 1) {
+        const player = orderedPlayers[(teamSeed - 1) * 3 + (seatOrder - 1)] ?? null;
+        assigned.set(`${teamSeed}-${seatOrder}`, player?.id ?? null);
+      }
+    }
+  }
+
+  return TEAM_EDITOR_SEEDS.flatMap((teamSeed) =>
+    [1, 2, 3].map((seatOrder) => ({
+      key: `${teamSeed}-${seatOrder}`,
+      teamSeed,
+      seatOrder,
+      tournamentPlayerId: assigned.get(`${teamSeed}-${seatOrder}`) ?? null,
+    })),
+  );
+}
+
+function sortPlayersForTeamEditor(players: Player[]): Player[] {
+  return [...players].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+}
+
+interface TeamSlot {
+  key: string;
+  teamSeed: number;
+  seatOrder: number;
+  tournamentPlayerId: string | null;
+}
+
+function TeamEditor({
+  teams,
+  players,
+  disabled,
+  onSave,
+}: {
+  teams: TournamentTeam[];
+  players: Player[];
+  disabled: boolean;
+  onSave: (
+    assignments: Array<{ teamSeed: number; tournamentPlayerId: string; seatOrder: number }>,
+  ) => Promise<void>;
+}) {
+  const playerById = useMemo(
+    () => new Map(players.map((player) => [player.id, player])),
+    [players],
+  );
+  const initialSlots = useMemo(() => buildInitialTeamSlots(players, teams), [players, teams]);
+  const [slots, setSlots] = useState<TeamSlot[]>(initialSlots);
+  const [draggedSlotKey, setDraggedSlotKey] = useState<string | null>(null);
+  const [dragOverSlotKey, setDragOverSlotKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSlots(initialSlots);
+  }, [initialSlots]);
+
+  const swapSlots = (sourceKey: string, targetKey: string) => {
+    if (sourceKey === targetKey) return;
+    setSlots((current) => {
+      const next = current.map((slot) => ({ ...slot }));
+      const source = next.find((slot) => slot.key === sourceKey);
+      const target = next.find((slot) => slot.key === targetKey);
+      if (!source || !target) return current;
+      [source.tournamentPlayerId, target.tournamentPlayerId] = [
+        target.tournamentPlayerId,
+        source.tournamentPlayerId,
+      ];
+      return next;
+    });
+  };
+
+  const allSlotsFilled = slots.every((slot) => slot.tournamentPlayerId);
+
+  return (
+    <div className="mt-4 rounded-[1.5rem] border border-amber-200 bg-[linear-gradient(180deg,#fff8ea_0%,#ffffff_100%)] p-5 shadow-[0_18px_45px_rgba(120,53,15,0.08)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.26em] text-amber-700">
+            Manual Team Layout
+          </p>
+          <p className="mt-2 text-sm text-slate-600">
+            Drag player cards between Team A and Team B. Board slots determine the fixed pairing
+            lane for the round sheet.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setSlots(initialSlots)}
+          disabled={disabled}
+          className="rounded-2xl border border-amber-200 bg-white px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-50 disabled:opacity-50"
+        >
+          Reset Layout
+        </button>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        {TEAM_EDITOR_SEEDS.map((teamSeed) => (
+          <div
+            key={teamSeed}
+            className="rounded-[1.35rem] border border-slate-200 bg-white/90 p-4 shadow-[0_14px_30px_rgba(15,23,42,0.06)]"
+          >
+            <div className="flex items-center justify-between">
+              <p className="font-serif text-xl font-semibold tracking-tight text-slate-950">
+                Team {teamSeed === 1 ? 'A' : 'B'}
+              </p>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                3 Boards
+              </span>
+            </div>
+            <div className="mt-4 space-y-3">
+              {slots
+                .filter((slot) => slot.teamSeed === teamSeed)
+                .map((slot) => {
+                  const player = slot.tournamentPlayerId
+                    ? (playerById.get(slot.tournamentPlayerId) ?? null)
+                    : null;
+
+                  return (
+                    <div
+                      key={slot.key}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        setDragOverSlotKey(slot.key);
+                      }}
+                      onDragLeave={() =>
+                        setDragOverSlotKey((current) => (current === slot.key ? null : current))
+                      }
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        const sourceKey =
+                          draggedSlotKey || event.dataTransfer.getData('text/plain') || null;
+                        if (sourceKey) swapSlots(sourceKey, slot.key);
+                        setDraggedSlotKey(null);
+                        setDragOverSlotKey(null);
+                      }}
+                      className={`rounded-[1.2rem] border px-4 py-3 transition ${
+                        dragOverSlotKey === slot.key
+                          ? 'border-amber-400 bg-amber-50 shadow-[0_0_0_3px_rgba(251,191,36,0.18)]'
+                          : 'border-slate-200 bg-slate-50'
+                      }`}
+                    >
+                      <div className="mb-2 flex items-center justify-between text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                        <span>Board {slot.seatOrder}</span>
+                        <span>{player?.seatNumber ? `Seat ${player.seatNumber}` : 'Unseated'}</span>
+                      </div>
+                      <div
+                        draggable={Boolean(player) && !disabled}
+                        onDragStart={(event) => {
+                          if (!player) return;
+                          event.dataTransfer.effectAllowed = 'move';
+                          event.dataTransfer.setData('text/plain', slot.key);
+                          setDraggedSlotKey(slot.key);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedSlotKey(null);
+                          setDragOverSlotKey(null);
+                        }}
+                        className={`rounded-[1rem] border border-white/80 bg-white px-4 py-3 shadow-sm transition ${
+                          disabled
+                            ? 'cursor-not-allowed opacity-60'
+                            : 'cursor-grab active:cursor-grabbing'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">
+                              {player?.name ?? 'Empty Slot'}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {player?.seatNumber
+                                ? `Draft seat ${player.seatNumber}`
+                                : 'Drop a player here'}
+                            </p>
+                          </div>
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Drag
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={() =>
+          void onSave(
+            slots.flatMap((slot) =>
+              slot.tournamentPlayerId
+                ? [
+                    {
+                      teamSeed: slot.teamSeed,
+                      tournamentPlayerId: slot.tournamentPlayerId,
+                      seatOrder: slot.seatOrder,
+                    },
+                  ]
+                : [],
+            ),
+          )
+        }
+        disabled={disabled || !allSlotsFilled}
+        className="mt-5 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+      >
+        Save Team Assignments
+      </button>
+    </div>
+  );
+}
 
 export function Tournament() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { canManage } = useAuth();
   const [tournament, setTournament] = useState<TournamentDetail | null>(null);
+  const [leagues, setLeagues] = useState<League[]>([]);
   const [tab, setTab] = useState<Tab>('players');
+  const [selectedPairingsRoundNumber, setSelectedPairingsRoundNumber] = useState<number | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmation, setDeleteConfirmation] = useState('');
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [isRandomizingSeats, setIsRandomizingSeats] = useState(false);
-
-  // Edit tournament state
   const [showEdit, setShowEdit] = useState(false);
   const [editName, setEditName] = useState('');
   const [editFormat, setEditFormat] = useState('');
   const [editSubtitle, setEditSubtitle] = useState('');
   const [editCubeCobraUrl, setEditCubeCobraUrl] = useState('');
-  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editRounds, setEditRounds] = useState('');
+  const [editLeagueId, setEditLeagueId] = useState('');
+  const [editTeamMode, setEditTeamMode] = useState<TeamMode>('NONE');
+  const [editTeamSetupTiming, setEditTeamSetupTiming] = useState<TeamSetupTiming>('BEFORE_DRAFT');
 
   const refresh = useCallback(async () => {
     if (!id) return;
     try {
-      const t = await api.getTournament(id);
-      setTournament(t);
-    } catch {
-      setError('Failed to load tournament');
+      const [nextTournament, nextLeagues] = await Promise.all([
+        api.getTournament(id),
+        api.listLeagues(),
+      ]);
+      setTournament(nextTournament);
+      setLeagues(nextLeagues);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load tournament');
     }
   }, [id]);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
   useEffect(() => {
@@ -54,103 +297,97 @@ export function Tournament() {
     if (!id) return;
     joinTournament(id);
     const socket = getSocket();
-    const onUpdate = () => refresh();
+    const onUpdate = () => void refresh();
     socket.on('pairings_updated', onUpdate);
     socket.on('standings_updated', onUpdate);
     socket.on('result_reported', onUpdate);
     socket.on('round_started', onUpdate);
+    socket.on('tournament_updated', onUpdate);
     return () => {
       socket.off('pairings_updated', onUpdate);
       socket.off('standings_updated', onUpdate);
       socket.off('result_reported', onUpdate);
       socket.off('round_started', onUpdate);
+      socket.off('tournament_updated', onUpdate);
     };
   }, [id, refresh]);
 
-  const handleStart = async () => {
-    if (!id || !confirm('Start the tournament?')) return;
-    setLoading(true);
-    try {
-      await api.startTournament(id);
-      await refresh();
-      setTab(
-        tournament?.format === 'Cube' || tournament?.format === 'Draft' ? 'players' : 'pairings',
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error');
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (!tournament) return;
+    if (tournament.rounds.length === 0) {
+      setSelectedPairingsRoundNumber(null);
+      return;
     }
-  };
 
-  const handleGenerateRound = async () => {
-    if (!id) return;
-    setLoading(true);
-    setError('');
-    try {
-      await api.generateRound(id);
-      await refresh();
-      setTab('pairings');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error generating round');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const hasSelectedRound = tournament.rounds.some(
+      (round) => round.number === selectedPairingsRoundNumber,
+    );
+    if (hasSelectedRound) return;
 
-  const handleFinish = async () => {
-    if (!id || !confirm('End the tournament and finalize standings?')) return;
-    try {
-      await api.finishTournament(id);
-      await refresh();
-      setTab('standings');
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error');
-    }
-  };
+    const activeRound = tournament.rounds.find((round) => round.number === tournament.currentRound);
+    setSelectedPairingsRoundNumber(
+      activeRound?.number ?? tournament.rounds[tournament.rounds.length - 1]?.number ?? null,
+    );
+  }, [selectedPairingsRoundNumber, tournament]);
 
-  const handleDeleteTournament = async () => {
-    if (!id || !tournament) return;
-    if (deleteConfirmation !== tournament.name) return;
+  if (!tournament) {
+    return <div className="py-16 text-center text-gray-400">Loading tournament…</div>;
+  }
 
-    setDeleteLoading(true);
-    setError('');
-    try {
-      await api.deleteTournament(id);
-      navigate('/');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error deleting tournament');
-      setDeleteLoading(false);
-    }
-  };
-
-  const handleRandomizeSeats = async () => {
-    if (!id) return;
-    setIsRandomizingSeats(true);
-    setError('');
-    try {
-      await api.randomizeSeats(id);
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error randomizing seats');
-    } finally {
-      setIsRandomizingSeats(false);
-    }
-  };
+  const currentRound = tournament.rounds.find(
+    (round) => round.number === tournament.currentRound,
+  ) as RoundDetail | undefined;
+  const selectedPairingsRound =
+    tournament.rounds.find((round) => round.number === selectedPairingsRoundNumber) ??
+    currentRound ??
+    tournament.rounds[tournament.rounds.length - 1];
+  const isSeatBasedTournament = tournament.format === 'Cube' || tournament.format === 'Draft';
+  const isTeamDraft = tournament.teamMode === 'TEAM_DRAFT_3V3';
+  const teamSetupBeforeDraft = tournament.teamSetupTiming === 'BEFORE_DRAFT';
+  const activePlayers = tournament.players.filter((player) => player.active);
+  const allActivePlayersSeated =
+    activePlayers.length > 0 && activePlayers.every((player) => player.seatNumber != null);
+  const hasSeatAssignments = activePlayers.some((player) => player.seatNumber != null);
+  const teamDraftTeamsReady =
+    tournament.teams.length === 2 && tournament.teams.every((team) => team.members.length === 3);
+  const teamDraftNeedsAssignment = isTeamDraft && !teamDraftTeamsReady;
+  const teamDraftCanSetTeams =
+    canManage &&
+    tournament.status === 'ACTIVE' &&
+    tournament.currentRound === 0 &&
+    tournament.rounds.length === 0 &&
+    (teamSetupBeforeDraft || hasSeatAssignments);
+  const allResultsIn = currentRound?.matches.every((match) => match.result !== 'PENDING') ?? false;
+  const canGenerateRound =
+    tournament.status === 'ACTIVE' &&
+    (tournament.currentRound === 0 || allResultsIn) &&
+    tournament.currentRound < tournament.totalRounds &&
+    (!isSeatBasedTournament || tournament.currentRound > 0 || allActivePlayersSeated) &&
+    (!isTeamDraft || teamDraftTeamsReady);
+  const canRandomizeSeats =
+    canManage &&
+    isSeatBasedTournament &&
+    tournament.status === 'ACTIVE' &&
+    tournament.currentRound === 0 &&
+    tournament.rounds.length === 0 &&
+    (!isTeamDraft || !teamSetupBeforeDraft || teamDraftTeamsReady);
 
   const openEdit = () => {
-    if (!tournament) return;
     setEditName(tournament.name);
     setEditFormat(tournament.format);
     setEditSubtitle(tournament.subtitle);
     setEditCubeCobraUrl(tournament.cubeCobraUrl ?? '');
+    setEditRounds(String(tournament.totalRounds || ''));
+    setEditLeagueId(tournament.leagueId ?? '');
+    setEditTeamMode(tournament.teamMode);
+    setEditTeamSetupTiming(tournament.teamSetupTiming);
     setShowEdit(true);
   };
 
   const handleUpdateTournament = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
-    setEditSubmitting(true);
+    setLoading(true);
     setError('');
     try {
       await api.updateTournament(id, {
@@ -158,355 +395,514 @@ export function Tournament() {
         format: editFormat || undefined,
         subtitle: editSubtitle.trim(),
         cubeCobraUrl: editCubeCobraUrl.trim() || null,
+        totalRounds: parseInt(editRounds, 10) || undefined,
+        leagueId: editLeagueId || null,
+        teamMode: editTeamMode,
+        teamSetupTiming: editTeamSetupTiming,
       });
-      await refresh();
       setShowEdit(false);
+      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error updating tournament');
     } finally {
-      setEditSubmitting(false);
+      setLoading(false);
     }
   };
 
-  if (!tournament) {
-    return <div className="text-center py-16 text-gray-400">Loading...</div>;
-  }
+  const startTournament = async () => {
+    if (!id || !confirm('Start the tournament?')) return;
+    setLoading(true);
+    try {
+      await api.startTournament(id);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error starting tournament');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const currentRound = tournament.rounds.find((r) => r.number === tournament.currentRound) as
-    | RoundDetail
-    | undefined;
+  const generateRound = async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      await api.generateRound(id);
+      setTab('pairings');
+      setSelectedPairingsRoundNumber(tournament.currentRound + 1);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error generating round');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const isSeatBasedTournament = tournament.format === 'Cube' || tournament.format === 'Draft';
-  const activePlayers = tournament.players.filter((player) => player.active);
-  const allActivePlayersSeated =
-    activePlayers.length > 0 && activePlayers.every((player) => player.seatNumber != null);
-  const hasSeatAssignments = activePlayers.some((player) => player.seatNumber != null);
-  const canRandomizeSeats =
-    isSeatBasedTournament &&
-    tournament.status === 'ACTIVE' &&
-    tournament.currentRound === 0 &&
-    tournament.rounds.length === 0;
-  const showDraftPod =
-    isSeatBasedTournament &&
-    (tournament.status === 'REGISTRATION' || canRandomizeSeats || hasSeatAssignments);
+  const finishTournament = async () => {
+    if (!id || !confirm('Finalize the tournament?')) return;
+    setLoading(true);
+    try {
+      await api.finishTournament(id);
+      setTab('standings');
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error finalizing tournament');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const allResultsIn = currentRound?.matches.every((m) => m.result !== 'PENDING') ?? false;
-
-  const canGenerateRound =
-    tournament.status === 'ACTIVE' &&
-    (tournament.currentRound === 0 || allResultsIn) &&
-    tournament.currentRound < tournament.totalRounds &&
-    (!isSeatBasedTournament || tournament.currentRound > 0 || allActivePlayersSeated);
-
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'players', label: 'Players' },
-    { key: 'pairings', label: 'Pairings' },
-    { key: 'standings', label: 'Standings' },
-  ];
+  const deleteTournament = async () => {
+    if (!id || !confirm(`Delete ${tournament.name}?`)) return;
+    setLoading(true);
+    try {
+      await api.deleteTournament(id);
+      navigate('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error deleting tournament');
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
-        <div>
-          <Link to="/" className="text-blue-500 text-sm hover:underline">
-            ← Back
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900 mt-1">{tournament.name}</h1>
-          <p className="text-sm text-gray-500">
-            {tournament.format}
-            {tournament.subtitle ? ` · ${tournament.subtitle}` : ''} · {tournament.players.length}{' '}
-            players · Round {tournament.currentRound}/{tournament.totalRounds || '?'}
-          </p>
-          {tournament.cubeCobraUrl && (
-            <a
-              href={tournament.cubeCobraUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-blue-500 hover:underline"
-            >
-              🧊 View cube list
-            </a>
-          )}
-        </div>
-
-        <div className="flex gap-2 flex-wrap">
-          {tournament.status === 'REGISTRATION' && (
-            <button
-              onClick={handleStart}
-              disabled={loading}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold text-sm disabled:opacity-50"
-            >
-              Start Tournament
-            </button>
-          )}
-          {canGenerateRound && (
-            <button
-              onClick={handleGenerateRound}
-              disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold text-sm disabled:opacity-50"
-            >
-              {loading
-                ? 'Generating...'
-                : isSeatBasedTournament && tournament.currentRound === 0
-                  ? 'Pair Round 1'
-                  : `Pair Round ${tournament.currentRound + 1}`}
-            </button>
-          )}
-          {tournament.status === 'ACTIVE' &&
-            tournament.currentRound >= tournament.totalRounds &&
-            allResultsIn && (
-              <button
-                onClick={handleFinish}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-semibold text-sm"
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Tournament"
+        title={tournament.name}
+        compact
+        description={`${tournament.format}${tournament.subtitle ? ` · ${tournament.subtitle}` : ''}${tournament.league?.name ? ` · ${tournament.league.name}` : ''}${tournament.teamMode === 'TEAM_DRAFT_3V3' ? ` · Team Draft 3v3 · ${tournament.teamSetupTiming === 'BEFORE_DRAFT' ? 'Teams Before Draft' : 'Teams After Draft'}` : ''}`}
+        meta={
+          <>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
+              {tournament.status}
+            </span>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
+              {tournament.players.length} players
+            </span>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
+              Round {tournament.currentRound}/{tournament.totalRounds || '?'}
+            </span>
+            {tournament.eventStage && (
+              <Link
+                to={`/events/${tournament.eventStage.eventId}`}
+                className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-rose-700 transition hover:bg-rose-100"
               >
-                Finalize Tournament
+                {tournament.eventStage.eventName} · {tournament.eventStage.name}
+              </Link>
+            )}
+          </>
+        }
+        actions={
+          <>
+            {canManage && tournament.status === 'REGISTRATION' && (
+              <button
+                onClick={() => void startTournament()}
+                disabled={loading}
+                className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+              >
+                Start Tournament
               </button>
             )}
-          <button
-            onClick={() => api.exportCSV(tournament.id)}
-            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded font-semibold text-sm"
-          >
-            Export CSV
-          </button>
-          <button
-            onClick={openEdit}
-            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded font-semibold text-sm"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => {
-              setShowDeleteConfirm((current) => !current);
-              setDeleteConfirmation('');
-            }}
-            className="bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 rounded font-semibold text-sm"
-          >
-            Delete Tournament
-          </button>
+            {canManage && canGenerateRound && (
+              <button
+                onClick={() => void generateRound()}
+                disabled={loading}
+                className="rounded-2xl bg-sky-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:opacity-50"
+              >
+                {loading ? 'Generating…' : `Pair Round ${tournament.currentRound + 1}`}
+              </button>
+            )}
+            {canManage &&
+              tournament.status === 'ACTIVE' &&
+              tournament.currentRound >= tournament.totalRounds &&
+              allResultsIn && (
+                <button
+                  onClick={() => void finishTournament()}
+                  className="rounded-2xl bg-violet-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-600"
+                >
+                  Finalize Tournament
+                </button>
+              )}
+            <button
+              onClick={() => api.exportCSV(tournament.id)}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300"
+            >
+              Export CSV
+            </button>
+            {canManage && (
+              <>
+                <button
+                  onClick={openEdit}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => void deleteTournament()}
+                  className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                >
+                  Delete
+                </button>
+              </>
+            )}
+          </>
+        }
+      />
+
+      {tournament.status === 'ACTIVE' && (
+        <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Changing planned rounds mid-event is a local organizer workflow and not sanctioned
+          fixed-round behavior.
         </div>
-      </div>
+      )}
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded text-sm">
+        <div className="rounded-[1.5rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {showEdit && (
-        <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
-          <p className="text-sm font-semibold text-blue-800 mb-3">Edit Tournament</p>
-          <form onSubmit={handleUpdateTournament} className="space-y-3">
+      {showEdit && canManage && (
+        <form
+          onSubmit={handleUpdateTournament}
+          className="rounded-[1.75rem] border border-sky-200 bg-sky-50 p-5 space-y-3"
+        >
+          <p className="text-sm font-semibold text-sky-800">Edit Tournament</p>
+          <input
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+          />
+          <div className="grid gap-3 md:grid-cols-2">
+            <select
+              value={editFormat}
+              onChange={(e) => setEditFormat(e.target.value)}
+              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+            >
+              {[
+                'Draft',
+                'Sealed',
+                'Cube',
+                'Standard',
+                'Pioneer',
+                'Modern',
+                'Legacy',
+                'Vintage',
+                'Pauper',
+                'Commander',
+              ].map((format) => (
+                <option key={format} value={format}>
+                  {format}
+                </option>
+              ))}
+            </select>
+            <input
+              value={editRounds}
+              onChange={(e) => setEditRounds(e.target.value)}
+              placeholder="Total rounds"
+              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+            />
+          </div>
+          <input
+            value={editSubtitle}
+            onChange={(e) => setEditSubtitle(e.target.value)}
+            placeholder="Subtitle"
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+          />
+          <input
+            value={editCubeCobraUrl}
+            onChange={(e) => setEditCubeCobraUrl(e.target.value)}
+            placeholder="Cube Cobra URL"
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+          />
+          <div className="grid gap-3 md:grid-cols-2">
+            <select
+              value={editLeagueId}
+              onChange={(e) => setEditLeagueId(e.target.value)}
+              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+            >
+              <option value="">No league</option>
+              {leagues.map((league) => (
+                <option key={league.id} value={league.id}>
+                  {league.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={editTeamMode}
+              onChange={(e) => setEditTeamMode(e.target.value as TeamMode)}
+              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+              disabled={tournament.status !== 'REGISTRATION'}
+            >
+              <option value="NONE">Individual</option>
+              <option value="TEAM_DRAFT_3V3">Team Draft 3v3</option>
+            </select>
+          </div>
+          {editTeamMode === 'TEAM_DRAFT_3V3' && (
+            <div className="grid gap-3 md:grid-cols-2">
+              <select
+                value={editTeamSetupTiming}
+                onChange={(e) => setEditTeamSetupTiming(e.target.value as TeamSetupTiming)}
+                className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+                disabled={tournament.status !== 'REGISTRATION'}
+              >
+                <option value="BEFORE_DRAFT">Teams before draft</option>
+                <option value="AFTER_DRAFT">Teams after draft</option>
+              </select>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {editTeamSetupTiming === 'BEFORE_DRAFT'
+                  ? 'Teams are set first, then seats are randomized to alternate opponents around the pod.'
+                  : 'Players draft as individuals and teams are locked in before round 1.'}
+              </div>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded-2xl bg-sky-700 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowEdit(false)}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {tournament.teamMode === 'TEAM_DRAFT_3V3' && (
+        <section className="rounded-[1.75rem] border border-white/80 bg-white/88 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Name</label>
-              <input
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <h2 className="font-serif text-2xl font-semibold tracking-tight text-slate-950">
+                Team Draft
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {teamSetupBeforeDraft
+                  ? 'Set teams first, then seat the pod in alternating opponents to preserve classic team-draft dynamics.'
+                  : 'Draft as six individuals, then assign teams before round 1 to remove hate-drafting incentives.'}
+              </p>
             </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="text-xs text-gray-500 mb-1 block">Game Format</label>
-                <select
-                  value={editFormat}
-                  onChange={(e) => setEditFormat(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            {teamDraftCanSetTeams && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={async () => {
+                    if (!id) return;
+                    setLoading(true);
+                    setError('');
+                    try {
+                      await api.generateTeams(id);
+                      await refresh();
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Error generating teams');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                  disabled={loading}
                 >
-                  <option value="Draft">Draft</option>
-                  <option value="Sealed">Sealed</option>
-                  <option value="Cube">Cube</option>
-                  <option value="Standard">Standard</option>
-                  <option value="Pioneer">Pioneer</option>
-                  <option value="Modern">Modern</option>
-                  <option value="Legacy">Legacy</option>
-                  <option value="Vintage">Vintage</option>
-                  <option value="Pauper">Pauper</option>
-                  <option value="Commander">Commander</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-              <div className="flex-1">
-                <label className="text-xs text-gray-500 mb-1 block">Subtitle (optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. OTJ, Premodern…"
-                  value={editSubtitle}
-                  onChange={(e) => setEditSubtitle(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-            {editFormat === 'Cube' && (
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">
-                  Cube Cobra URL (optional)
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://cubecobra.com/cube/list/…"
-                  value={editCubeCobraUrl}
-                  onChange={(e) => setEditCubeCobraUrl(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                  Random Teams
+                </button>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {teamSetupBeforeDraft ? 'Step 1 of 2' : 'Before round 1'}
+                </span>
               </div>
             )}
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={editSubmitting}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-semibold disabled:opacity-50"
-              >
-                {editSubmitting ? 'Saving…' : 'Save Changes'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowEdit(false)}
-                className="px-4 py-2 rounded text-sm text-gray-600 hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {showDeleteConfirm && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-semibold text-red-800">Delete tournament</p>
-          <p className="mt-1 text-sm text-red-700">
-            This will permanently remove <span className="font-semibold">{tournament.name}</span>{' '}
-            and all of its players, rounds, matches, and standings.
-          </p>
-          <p className="mt-3 text-sm text-red-700">
-            Type <span className="font-mono font-semibold">{tournament.name}</span> to confirm.
-          </p>
-          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <input
-              type="text"
-              value={deleteConfirmation}
-              onChange={(e) => setDeleteConfirmation(e.target.value)}
-              placeholder="Tournament name"
-              className="w-full max-w-md rounded border border-red-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={handleDeleteTournament}
-                disabled={deleteLoading || deleteConfirmation !== tournament.name}
-                className="rounded bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {deleteLoading ? 'Deleting...' : 'Permanently Delete'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setDeleteConfirmation('');
-                }}
-                className="rounded bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-            </div>
           </div>
-        </div>
+
+          {teamDraftNeedsAssignment && (
+            <div className="mt-4 rounded-[1.35rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {teamSetupBeforeDraft
+                ? 'Pick teams first, then use Randomize Seats to alternate opponents around the draft pod.'
+                : hasSeatAssignments
+                  ? 'Seats are already set. Assign teams now, then pair round 1.'
+                  : 'Randomize seats for the draft first. Once the pod is seated, you can assign post-draft teams here.'}
+            </div>
+          )}
+
+          {teamSetupBeforeDraft && teamDraftTeamsReady && !allActivePlayersSeated && (
+            <div className="mt-4 rounded-[1.35rem] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+              Teams are locked in. The next step is seat randomization, which will place Team A on
+              seats 1, 3, 5 and Team B on seats 2, 4, 6 in random internal order.
+            </div>
+          )}
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {tournament.teams.map((team) => (
+              <div
+                key={team.id}
+                className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4"
+              >
+                <p className="text-sm font-semibold text-slate-900">{team.name}</p>
+                <div className="mt-3 space-y-2">
+                  {team.members.map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex items-center justify-between text-sm text-slate-700"
+                    >
+                      <span>
+                        Board {member.seatOrder} · {member.player.name}
+                      </span>
+                      <span className="text-slate-400">Seat {member.player.seatNumber ?? '—'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {tournament.teamStandings.length > 0 && (
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-100 text-left text-xs uppercase text-slate-500">
+                    <th className="px-3 py-2">Rank</th>
+                    <th className="px-3 py-2">Team</th>
+                    <th className="px-3 py-2">MP</th>
+                    <th className="px-3 py-2">Rounds</th>
+                    <th className="px-3 py-2">Boards</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tournament.teamStandings.map((standing) => (
+                    <tr key={standing.id} className="border-t border-slate-100">
+                      <td className="px-3 py-2 font-semibold text-slate-900">{standing.rank}</td>
+                      <td className="px-3 py-2 text-slate-800">{standing.team.name}</td>
+                      <td className="px-3 py-2 text-slate-800">{standing.matchPoints}</td>
+                      <td className="px-3 py-2 text-slate-600">
+                        {standing.roundWins}-{standing.roundLosses}-{standing.roundDraws}
+                      </td>
+                      <td className="px-3 py-2 text-slate-600">
+                        {standing.boardWins}-{standing.boardLosses}-{standing.boardDraws}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {teamDraftCanSetTeams && activePlayers.length === 6 && (
+            <TeamEditor
+              teams={tournament.teams}
+              players={activePlayers}
+              disabled={loading}
+              onSave={async (assignments) => {
+                if (!id) return;
+                setLoading(true);
+                setError('');
+                try {
+                  await api.saveTeams(id, assignments);
+                  await refresh();
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Error saving teams');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            />
+          )}
+        </section>
       )}
 
-      {/* Round timer */}
-      {tournament.status === 'ACTIVE' && currentRound?.status === 'ACTIVE' && (
-        <div className="mb-6 p-4 bg-white border border-gray-200 rounded-lg text-center">
-          <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
-            Round {currentRound.number} Timer
-          </p>
-          <Timer durationMinutes={50} storageKey={`round-timer-${currentRound.id}`} />
+      <div className="rounded-[1.75rem] border border-white/80 bg-white/88 p-2 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+        <div className="grid grid-cols-3 gap-2">
+          {(['players', 'pairings', 'standings'] as Tab[]).map((value) => (
+            <button
+              key={value}
+              onClick={() => setTab(value)}
+              className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                tab === value
+                  ? 'bg-slate-950 text-white'
+                  : 'bg-transparent text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {value[0].toUpperCase() + value.slice(1)}
+            </button>
+          ))}
         </div>
-      )}
-
-      {/* Tabs */}
-      <div className="flex gap-1 mb-4 border-b border-gray-200">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
-              tab === t.key
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-800'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
-        {tab === 'players' && (
-          <>
-            {showDraftPod && (
-              <DraftPod
-                players={tournament.players}
-                status={tournament.status}
-                canRandomize={canRandomizeSeats}
-                isRandomizing={isRandomizingSeats}
-                onRandomize={handleRandomizeSeats}
-              />
-            )}
-            <PlayerList
-              tournamentId={tournament.id}
+      {tab === 'players' && (
+        <section className="rounded-[1.75rem] border border-white/80 bg-white/88 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+          {isSeatBasedTournament && (
+            <DraftPod
               players={tournament.players}
-              canEdit={tournament.status === 'REGISTRATION'}
-              onUpdate={refresh}
+              status={tournament.status}
+              canRandomize={canRandomizeSeats}
+              isRandomizing={loading}
+              storageKey={`draft-pod-collapsed-${id}`}
+              onRandomize={() => {
+                if (!id) return;
+                setLoading(true);
+                setError('');
+                api
+                  .randomizeSeats(id)
+                  .then(() => refresh())
+                  .catch((err) => {
+                    setError(err instanceof Error ? err.message : 'Error randomizing seats');
+                  })
+                  .finally(() => setLoading(false));
+              }}
             />
-          </>
-        )}
+          )}
+          <PlayerList
+            tournamentId={tournament.id}
+            players={tournament.players}
+            canEdit={canManage && tournament.status === 'REGISTRATION'}
+            onUpdate={() => void refresh()}
+          />
+        </section>
+      )}
 
-        {tab === 'pairings' && (
-          <div className="space-y-6">
-            {tournament.rounds.length === 0 && (
-              <p className="text-gray-400 text-sm text-center py-8">No rounds generated yet.</p>
-            )}
-            {[...tournament.rounds]
-              .sort((a, b) => b.number - a.number)
-              .map((round) => (
-                <div key={round.id}>
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                    Round {round.number}{' '}
-                    <span
-                      className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
-                        round.status === 'ACTIVE'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {round.status}
-                    </span>
-                  </h3>
-                  <PairingsTable
-                    matches={(round as RoundDetail).matches}
-                    canReport={
-                      tournament.status === 'ACTIVE' &&
-                      (round.status === 'ACTIVE' || round.status === 'FINISHED')
-                    }
-                    bestOfFormat={tournament.bestOfFormat}
-                    onUpdate={refresh}
-                  />
-                </div>
-              ))}
-          </div>
-        )}
+      {tab === 'pairings' && (
+        <section className="rounded-[1.75rem] border border-white/80 bg-white/88 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+          {selectedPairingsRound?.status === 'ACTIVE' && (
+            <div className="mb-5 rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4 text-center">
+              <Timer durationMinutes={50} storageKey={`round-timer-${selectedPairingsRound.id}`} />
+            </div>
+          )}
+          {selectedPairingsRound ? (
+            <PairingsTable
+              matches={selectedPairingsRound.matches}
+              canReport={canManage && tournament.status !== 'REGISTRATION'}
+              bestOfFormat={tournament.bestOfFormat}
+              onUpdate={() => void refresh()}
+              headerRight={
+                <RoundSelector
+                  rounds={tournament.rounds.map((round) => ({
+                    number: round.number,
+                    status: round.status,
+                  }))}
+                  selectedRound={selectedPairingsRound.number}
+                  onSelect={setSelectedPairingsRoundNumber}
+                />
+              }
+            />
+          ) : (
+            <p className="py-8 text-center text-sm text-slate-400">No pairings yet.</p>
+          )}
+        </section>
+      )}
 
-        {tab === 'standings' && (
+      {tab === 'standings' && (
+        <section className="rounded-[1.75rem] border border-white/80 bg-white/88 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
           <StandingsTable
             tournamentId={tournament.id}
             standings={tournament.standings}
             finishedRounds={tournament.rounds
-              .filter((r) => r.status === 'FINISHED')
-              .map((r) => r.number)
-              .sort((a, b) => a - b)}
+              .filter((round) => round.status === 'FINISHED')
+              .map((round) => round.number)
+              .sort((left, right) => left - right)}
             finished={tournament.status === 'FINISHED'}
           />
-        )}
-      </div>
+        </section>
+      )}
     </div>
   );
 }
