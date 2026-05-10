@@ -900,6 +900,7 @@ export function Tournament() {
               .map((round) => round.number)
               .sort((left, right) => left - right)}
             finished={tournament.status === 'FINISHED'}
+            isTeamDraft={tournament.teamMode === 'TEAM_DRAFT_3V3'}
           />
         </section>
       )}

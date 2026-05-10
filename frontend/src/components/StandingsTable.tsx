@@ -8,6 +8,7 @@ interface StandingsTableProps {
   standings: Standing[]; // current (latest) standings
   finishedRounds: number[]; // sorted list of round numbers that are FINISHED
   finished?: boolean;
+  isTeamDraft?: boolean;
 }
 
 export function StandingsTable({
@@ -15,6 +16,7 @@ export function StandingsTable({
   standings,
   finishedRounds,
   finished = false,
+  isTeamDraft = false,
 }: StandingsTableProps) {
   // null = "current" (latest), number = specific round
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
@@ -78,6 +80,10 @@ export function StandingsTable({
 
   const medal = (rank: number) => {
     if (!finished || selectedRound !== null) return null;
+    if (isTeamDraft) {
+      if (rank <= 3) return '🥇';
+      return null;
+    }
     if (rank === 1) return '🏆';
     if (rank === 2) return '🥈';
     if (rank === 3) return '🥉';
