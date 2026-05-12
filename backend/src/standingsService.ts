@@ -149,7 +149,8 @@ export async function recalculateStandings(tournamentId: string): Promise<void> 
     if (sa.matchPoints !== sb.matchPoints) return sb.matchPoints - sa.matchPoints;
     if (ta.omw !== tb.omw) return tb.omw - ta.omw;
     if (ta.gw !== tb.gw) return tb.gw - ta.gw;
-    return tb.ogw - ta.ogw;
+    if (ta.ogw !== tb.ogw) return tb.ogw - ta.ogw;
+    return a.name.localeCompare(b.name);
   });
 
   await prisma.$transaction(
@@ -350,7 +351,8 @@ export async function getStandingsAtRound(tournamentId: string, upToRound: numbe
     if (sa.matchPoints !== sb.matchPoints) return sb.matchPoints - sa.matchPoints;
     if (ta.omw !== tb.omw) return tb.omw - ta.omw;
     if (ta.gw !== tb.gw) return tb.gw - ta.gw;
-    return tb.ogw - ta.ogw;
+    if (ta.ogw !== tb.ogw) return tb.ogw - ta.ogw;
+    return a.name.localeCompare(b.name);
   });
 
   return sorted.map((p, idx) => {
