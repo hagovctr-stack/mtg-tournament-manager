@@ -7,11 +7,12 @@ import { PageHeader } from '../components/PageHeader';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 
 function formatDate(value: string) {
+  const localDate = new Date(value.slice(0, 10).replace(/-/g, '/'));
   return new Intl.DateTimeFormat(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
-  }).format(new Date(value));
+  }).format(localDate);
 }
 
 function formatPercent(value: number) {
