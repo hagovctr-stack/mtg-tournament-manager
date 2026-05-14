@@ -1,6 +1,123 @@
 import { prisma } from './db';
 import { calculateTiebreakers, type PlayerState, type MatchRecord } from './pairingAlgorithm';
 import { serializeStanding } from './presenters';
+import { usesTeamDraftMode } from './teamService';
+
+type TeamBoardTotals = {
+  teamId: string;
+  matchPoints: number;
+  boardWins: number;
+  boardLosses: number;
+  boardDraws: number;
+  gameWins: number;
+};
+
+function computeWinningTeamPlayerIds(
+  teams: Array<{ id: string; members: Array<{ tournamentPlayerId: string }> }>,
+  rounds: Array<{
+    matches: Array<{
+      player1TournamentPlayerId: string;
+      player2TournamentPlayerId: string | null;
+      result: string;
+      wins1?: number | null;
+      wins2?: number | null;
+    }>;
+  }>,
+): Set<string> {
+  if (teams.length === 0) return new Set();
+
+  const playerToTeamId = new Map<string, string>();
+  const teamTotals = new Map<string, TeamBoardTotals>();
+
+  for (const team of teams) {
+    teamTotals.set(team.id, {
+      teamId: team.id,
+      matchPoints: 0,
+      boardWins: 0,
+      boardLosses: 0,
+      boardDraws: 0,
+      gameWins: 0,
+    });
+    for (const member of team.members) {
+      playerToTeamId.set(member.tournamentPlayerId, team.id);
+    }
+  }
+
+  for (const round of rounds) {
+    const roundBoardTotals = new Map<string, { wins: number; losses: number }>();
+
+    for (const match of round.matches) {
+      if (match.result === 'PENDING' || match.result === 'BYE' || !match.player2TournamentPlayerId)
+        continue;
+      const t1Id = playerToTeamId.get(match.player1TournamentPlayerId);
+      const t2Id = playerToTeamId.get(match.player2TournamentPlayerId);
+      if (!t1Id || !t2Id || t1Id === t2Id) continue;
+
+      const t1 = teamTotals.get(t1Id)!;
+      const t2 = teamTotals.get(t2Id)!;
+      const r1 = roundBoardTotals.get(t1Id) ?? { wins: 0, losses: 0 };
+      const r2 = roundBoardTotals.get(t2Id) ?? { wins: 0, losses: 0 };
+
+      t1.gameWins += match.wins1 ?? 0;
+      t2.gameWins += match.wins2 ?? 0;
+
+      if (match.result === 'P1_WIN') {
+        t1.boardWins++;
+        t2.boardLosses++;
+        r1.wins++;
+        r2.losses++;
+      } else if (match.result === 'P2_WIN') {
+        t2.boardWins++;
+        t1.boardLosses++;
+        r2.wins++;
+        r1.losses++;
+      } else if (match.result === 'DRAW') {
+        t1.boardDraws++;
+        t2.boardDraws++;
+      }
+
+      roundBoardTotals.set(t1Id, r1);
+      roundBoardTotals.set(t2Id, r2);
+    }
+
+    if (roundBoardTotals.size === 2) {
+      const [fId, sId] = [...roundBoardTotals.keys()];
+      const f = roundBoardTotals.get(fId)!;
+      const s = roundBoardTotals.get(sId)!;
+      const ft = teamTotals.get(fId)!;
+      const st = teamTotals.get(sId)!;
+      if (f.wins > s.wins) {
+        ft.matchPoints += 3;
+      } else if (s.wins > f.wins) {
+        st.matchPoints += 3;
+      } else {
+        ft.matchPoints += 1;
+        st.matchPoints += 1;
+      }
+    }
+  }
+
+  const sortedTeams = [...teamTotals.values()].sort((a, b) => {
+    if (a.matchPoints !== b.matchPoints) return b.matchPoints - a.matchPoints;
+    if (a.boardWins !== b.boardWins) return b.boardWins - a.boardWins;
+    const aTotal = a.boardWins + a.boardLosses + a.boardDraws;
+    const bTotal = b.boardWins + b.boardLosses + b.boardDraws;
+    const aGW = aTotal > 0 ? a.boardWins / aTotal : 0;
+    const bGW = bTotal > 0 ? b.boardWins / bTotal : 0;
+    if (Math.abs(aGW - bGW) > 1e-9) return bGW - aGW;
+    if (a.gameWins !== b.gameWins) return b.gameWins - a.gameWins;
+    return 0;
+  });
+
+  const winningTeamId = sortedTeams[0]?.teamId;
+  if (!winningTeamId) return new Set();
+
+  const winnerIds = new Set<string>();
+  for (const [playerId, teamId] of playerToTeamId) {
+    if (teamId === winningTeamId) winnerIds.add(playerId);
+  }
+  return winnerIds;
+}
 
 export async function recalculateStandings(tournamentId: string): Promise<void> {
   const tournament = await prisma.tournament.findUnique({
@@ -11,6 +128,7 @@ export async function recalculateStandings(tournamentId: string): Promise<void> 
         include: { matches: true },
         where: { status: { in: ['ACTIVE', 'FINISHED'] } },
       },
+      teams: { include: { members: true } },
     },
   });
 
@@ -141,7 +259,17 @@ export async function recalculateStandings(tournamentId: string): Promise<void> 
 
   const tiebreakers = calculateTiebreakers(playerStates, matchRecords);
 
+  const isTeamDraft = usesTeamDraftMode((tournament as any).teamMode ?? 'NONE');
+  const winningTeamPlayerIds = isTeamDraft
+    ? computeWinningTeamPlayerIds((tournament as any).teams ?? [], tournament.rounds)
+    : null;
+
   const sorted = playerStates.sort((a, b) => {
+    if (winningTeamPlayerIds) {
+      const aWins = winningTeamPlayerIds.has(a.id);
+      const bWins = winningTeamPlayerIds.has(b.id);
+      if (aWins !== bWins) return aWins ? -1 : 1;
+    }
     const ta = tiebreakers.get(a.id)!;
     const tb = tiebreakers.get(b.id)!;
     const sa = statsMap.get(a.id)!;
@@ -212,6 +340,7 @@ export async function getStandingsAtRound(tournamentId: string, upToRound: numbe
         include: { matches: true },
         orderBy: { number: 'asc' },
       },
+      teams: { include: { members: true } },
     },
   });
 
@@ -343,7 +472,17 @@ export async function getStandingsAtRound(tournamentId: string, upToRound: numbe
 
   const tiebreakers = calculateTiebreakers(playerStates, matchRecords);
 
+  const isTeamDraftAtRound = usesTeamDraftMode((tournament as any).teamMode ?? 'NONE');
+  const winningTeamPlayerIdsAtRound = isTeamDraftAtRound
+    ? computeWinningTeamPlayerIds((tournament as any).teams ?? [], tournament.rounds)
+    : null;
+
   const sorted = playerStates.sort((a, b) => {
+    if (winningTeamPlayerIdsAtRound) {
+      const aWins = winningTeamPlayerIdsAtRound.has(a.id);
+      const bWins = winningTeamPlayerIdsAtRound.has(b.id);
+      if (aWins !== bWins) return aWins ? -1 : 1;
+    }
     const ta = tiebreakers.get(a.id)!,
       tb = tiebreakers.get(b.id)!;
     const sa = statsMap.get(a.id)!,

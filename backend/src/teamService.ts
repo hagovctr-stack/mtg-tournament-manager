@@ -392,6 +392,7 @@ export async function recalculateTeamStandings(tournamentId: string) {
       boardWins: 0,
       boardLosses: 0,
       boardDraws: 0,
+      gameWins: 0,
     });
   }
 
@@ -414,6 +415,11 @@ export async function recalculateTeamStandings(tournamentId: string) {
       const team2 = totals.get(team2Id);
       const round1 = roundTeamTotals.get(team1Id) ?? { wins: 0, losses: 0, draws: 0 };
       const round2 = roundTeamTotals.get(team2Id) ?? { wins: 0, losses: 0, draws: 0 };
+
+      const w1 = match.wins1 ?? 0;
+      const w2 = match.wins2 ?? 0;
+      team1.gameWins += w1;
+      team2.gameWins += w2;
 
       if (match.result === 'P1_WIN') {
         team1.boardWins += 1;
@@ -463,6 +469,14 @@ export async function recalculateTeamStandings(tournamentId: string) {
   const sorted = [...totals.values()].sort((left, right) => {
     if (left.matchPoints !== right.matchPoints) return right.matchPoints - left.matchPoints;
     if (left.boardWins !== right.boardWins) return right.boardWins - left.boardWins;
+    // Tiebreaker 3: board win percentage
+    const leftTotal = left.boardWins + left.boardLosses + left.boardDraws;
+    const rightTotal = right.boardWins + right.boardLosses + right.boardDraws;
+    const leftGW = leftTotal > 0 ? left.boardWins / leftTotal : 0;
+    const rightGW = rightTotal > 0 ? right.boardWins / rightTotal : 0;
+    if (Math.abs(leftGW - rightGW) > 1e-9) return rightGW - leftGW;
+    // Tiebreaker 4: total individual game wins
+    if (left.gameWins !== right.gameWins) return right.gameWins - left.gameWins;
     return left.teamName.localeCompare(right.teamName);
   });
 
