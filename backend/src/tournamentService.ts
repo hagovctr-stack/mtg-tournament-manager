@@ -101,6 +101,20 @@ function validateResult(wins1: number, wins2: number, format: BestOfFormat): voi
   // FREE: no restrictions
 }
 
+function parseHeldAt(heldAt?: string | null): Date | null | undefined {
+  if (heldAt === null) return null;
+  if (!heldAt) return undefined;
+  const parsed = new Date(heldAt);
+  if (isNaN(parsed.getTime())) throw new Error('Invalid date for heldAt');
+  const now = new Date();
+  // Allow up to end of today in UTC
+  const endOfToday = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999),
+  );
+  if (parsed > endOfToday) throw new Error('Tournament date cannot be in the future');
+  return parsed;
+}
+
 export async function createTournament(
   data: {
     name: string;
@@ -112,6 +126,7 @@ export async function createTournament(
     leagueId?: string | null;
     teamMode?: string;
     teamSetupTiming?: string;
+    heldAt?: string | null;
   },
   auth?: AuthContext,
 ) {
@@ -120,6 +135,7 @@ export async function createTournament(
     throw new Error(`Invalid bestOfFormat. Must be one of: ${VALID_BEST_OF_FORMATS.join(', ')}`);
   }
   validateTeamMode(data.format ?? 'Cube', data.teamMode);
+  const heldAt = parseHeldAt(data.heldAt);
   return prisma.tournament.create({
     data: {
       name: data.name,
@@ -133,6 +149,7 @@ export async function createTournament(
       leagueId: data.leagueId ?? null,
       organizationId: auth?.organizationId ?? null,
       createdById: auth?.userId ?? null,
+      ...(heldAt !== undefined ? { heldAt } : {}),
     } as any,
   });
 }
@@ -201,6 +218,7 @@ export async function getTournament(id: string, auth?: AuthContext) {
     teamSetupTiming: (tournament as any).teamSetupTiming ?? 'BEFORE_DRAFT',
     organizationId: tournament.organizationId,
     leagueId: tournament.leagueId,
+    heldAt: (tournament as any).heldAt?.toISOString() ?? null,
     startedAt: tournament.startedAt?.toISOString() ?? null,
     finishedAt: tournament.finishedAt?.toISOString() ?? null,
     totalRounds: tournament.totalRounds,
@@ -490,6 +508,7 @@ export async function updateTournament(
     leagueId?: string | null;
     teamMode?: string;
     teamSetupTiming?: string;
+    heldAt?: string | null;
   },
   auth?: AuthContext,
 ) {
@@ -503,26 +522,121 @@ export async function updateTournament(
   if ('cubeCobraUrl' in data) updateData.cubeCobraUrl = data.cubeCobraUrl ?? null;
   if (data.format !== undefined && tournament.status === 'REGISTRATION')
     updateData.format = data.format;
-  if ('leagueId' in data) updateData.leagueId = data.leagueId ?? null;
-  if (data.teamMode !== undefined) {
-    if (tournament.status !== 'REGISTRATION') {
-      throw new Error('Team mode must be configured before the tournament starts');
+  if ('leagueId' in data) {
+    if (data.leagueId) {
+      updateData.league = { connect: { id: data.leagueId } };
+    } else {
+      updateData.league = { disconnect: true };
     }
-    validateTeamMode(data.format ?? tournament.format, data.teamMode);
-    updateData.teamMode = data.teamMode === 'TEAM_DRAFT_3V3' ? 'TEAM_DRAFT_3V3' : 'NONE';
+  }
+  if (data.teamMode !== undefined) {
+    const normalizedNext = data.teamMode === 'TEAM_DRAFT_3V3' ? 'TEAM_DRAFT_3V3' : 'NONE';
+    if (normalizedNext !== tournament.teamMode) {
+      if (tournament.status !== 'REGISTRATION') {
+        throw new Error('Team mode must be configured before the tournament starts');
+      }
+      validateTeamMode(data.format ?? tournament.format, data.teamMode);
+      updateData.teamMode = normalizedNext;
+    }
   }
   if (data.teamSetupTiming !== undefined) {
-    if (tournament.status !== 'REGISTRATION') {
-      throw new Error('Team setup timing must be configured before the tournament starts');
+    const normalizedNext = normalizeTeamSetupTiming(data.teamSetupTiming);
+    if (normalizedNext !== ((tournament as any).teamSetupTiming ?? 'BEFORE_DRAFT')) {
+      if (tournament.status !== 'REGISTRATION') {
+        throw new Error('Team setup timing must be configured before the tournament starts');
+      }
+      updateData.teamSetupTiming = normalizedNext;
     }
-    updateData.teamSetupTiming = normalizeTeamSetupTiming(data.teamSetupTiming);
   }
   if (data.totalRounds !== undefined) {
     validateTournamentPlanUpdate(tournament, existingRoundCount, data.totalRounds);
     updateData.totalRounds = data.totalRounds;
   }
+  if ('heldAt' in data) {
+    const heldAt = parseHeldAt(data.heldAt);
+    if (heldAt !== undefined) updateData.heldAt = heldAt;
+    else updateData.heldAt = null;
+  }
 
   return prisma.tournament.update({ where: { id }, data: updateData as any });
+}
+
+export async function assignSeatsByOrder(tournamentId: string) {
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    include: {
+      players: { where: { active: true }, orderBy: { id: 'asc' } },
+      rounds: { select: { id: true } },
+    },
+  });
+  if (!tournament) throw new Error('Tournament not found');
+  if (!usesDraftPodSeating(tournament.format)) {
+    throw new Error('Seat assignment is only available for Draft and Cube tournaments');
+  }
+  if (tournament.status !== 'ACTIVE') {
+    throw new Error('Start the tournament before assigning seats');
+  }
+  if (tournament.currentRound > 0 || tournament.rounds.length > 0) {
+    throw new Error('Seats are locked once round 1 has been created');
+  }
+  validateTournamentPlayerCount(tournament.format, tournament.players.length);
+
+  await prisma.$transaction(
+    tournament.players.map((player, index) =>
+      prisma.tournamentPlayer.update({ where: { id: player.id }, data: { seatNumber: index + 1 } }),
+    ),
+  );
+
+  return { seated: tournament.players.length };
+}
+
+export async function updateSeatAssignments(
+  tournamentId: string,
+  assignments: Array<{ tournamentPlayerId: string; seatNumber: number }>,
+) {
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    include: {
+      players: { where: { active: true }, select: { id: true } },
+      rounds: { select: { id: true } },
+    },
+  });
+  if (!tournament) throw new Error('Tournament not found');
+  if (!usesDraftPodSeating(tournament.format)) {
+    throw new Error('Seat assignment is only available for Draft and Cube tournaments');
+  }
+  if (tournament.status !== 'ACTIVE') {
+    throw new Error('Start the tournament before assigning seats');
+  }
+  if (tournament.currentRound > 0 || tournament.rounds.length > 0) {
+    throw new Error('Seats are locked once round 1 has been created');
+  }
+
+  const activePlayerIds = new Set(tournament.players.map((p) => p.id));
+  const seatNumbers = assignments.map((a) => a.seatNumber);
+  const uniqueSeats = new Set(seatNumbers);
+  if (uniqueSeats.size !== seatNumbers.length) {
+    throw new Error('Seat numbers must be unique');
+  }
+  for (const a of assignments) {
+    if (!activePlayerIds.has(a.tournamentPlayerId)) {
+      throw new Error(`Player ${a.tournamentPlayerId} is not in this tournament`);
+    }
+    if (!Number.isInteger(a.seatNumber) || a.seatNumber < 1) {
+      throw new Error('Seat numbers must be positive integers');
+    }
+  }
+
+  await prisma.$transaction(
+    assignments.map((a) =>
+      prisma.tournamentPlayer.update({
+        where: { id: a.tournamentPlayerId },
+        data: { seatNumber: a.seatNumber },
+      }),
+    ),
+  );
+
+  return { seated: assignments.length };
 }
 
 export async function randomizeSeats(tournamentId: string) {

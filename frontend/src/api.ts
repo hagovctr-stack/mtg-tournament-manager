@@ -123,6 +123,12 @@ export const api = {
     request<Tournament>('PATCH', `/tournaments/${id}`, data),
   randomizeSeats: (id: string) =>
     request<TournamentDetail>('POST', `/tournaments/${id}/randomize-seats`),
+  assignSeatsByOrder: (id: string) =>
+    request<TournamentDetail>('POST', `/tournaments/${id}/assign-seats-by-order`),
+  updateSeatOrder: (
+    id: string,
+    assignments: Array<{ tournamentPlayerId: string; seatNumber: number }>,
+  ) => request<TournamentDetail>('PATCH', `/tournaments/${id}/seats`, { assignments }),
   exportCSV: (tournamentId: string) => {
     window.open(`${BASE_URL}/tournaments/${tournamentId}/export`, '_blank');
   },
@@ -235,6 +241,7 @@ export interface Tournament {
   organizationId: string | null;
   startedAt: string | null;
   finishedAt: string | null;
+  heldAt: string | null;
   createdAt: string;
   updatedAt: string;
   league?: LeagueRef | null;
@@ -369,6 +376,7 @@ export interface CreateTournamentInput {
   leagueId?: string | null;
   teamMode?: TeamMode;
   teamSetupTiming?: TeamSetupTiming;
+  heldAt?: string | null;
 }
 
 export interface UpdateTournamentInput {
@@ -380,6 +388,7 @@ export interface UpdateTournamentInput {
   leagueId?: string | null;
   teamMode?: TeamMode;
   teamSetupTiming?: TeamSetupTiming;
+  heldAt?: string | null;
 }
 
 export interface AddPlayerInput {

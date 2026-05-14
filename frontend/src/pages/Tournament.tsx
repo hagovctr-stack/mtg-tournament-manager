@@ -271,6 +271,7 @@ export function Tournament() {
   const [editLeagueId, setEditLeagueId] = useState('');
   const [editTeamMode, setEditTeamMode] = useState<TeamMode>('NONE');
   const [editTeamSetupTiming, setEditTeamSetupTiming] = useState<TeamSetupTiming>('BEFORE_DRAFT');
+  const [editHeldAt, setEditHeldAt] = useState('');
 
   const refresh = useCallback(async () => {
     if (!id) return;
@@ -384,6 +385,9 @@ export function Tournament() {
     setEditLeagueId(tournament.leagueId ?? '');
     setEditTeamMode(tournament.teamMode);
     setEditTeamSetupTiming(tournament.teamSetupTiming);
+    setEditHeldAt(
+      tournament.heldAt ? tournament.heldAt.slice(0, 10) : tournament.createdAt.slice(0, 10),
+    );
     setShowEdit(true);
   };
 
@@ -402,6 +406,7 @@ export function Tournament() {
         leagueId: editLeagueId || null,
         teamMode: editTeamMode,
         teamSetupTiming: editTeamSetupTiming,
+        heldAt: editHeldAt || null,
       });
       setShowEdit(false);
       await refresh();
@@ -428,11 +433,12 @@ export function Tournament() {
   const generateRound = async () => {
     if (!id) return;
     setLoading(true);
+    setTab('pairings'); // switch immediately so there's no flash of new data on old tab
+    const nextRound = tournament.currentRound + 1;
     try {
       await api.generateRound(id);
-      setTab('pairings');
-      setSelectedPairingsRoundNumber(tournament.currentRound + 1);
       await refresh();
+      setSelectedPairingsRoundNumber(nextRound); // set after refresh so the round exists
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error generating round');
     } finally {
@@ -607,13 +613,6 @@ export function Tournament() {
           document.body,
         )}
 
-      {tournament.status === 'ACTIVE' && (
-        <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Changing planned rounds mid-event is a local organizer workflow and not sanctioned
-          fixed-round behavior.
-        </div>
-      )}
-
       {error && (
         <div className="rounded-[1.5rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
@@ -626,11 +625,21 @@ export function Tournament() {
           className="rounded-[1.75rem] border border-sky-200 bg-sky-50 p-5 space-y-3"
         >
           <p className="text-sm font-semibold text-sky-800">Edit Tournament</p>
-          <input
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-          />
+          <div className="grid gap-3 md:grid-cols-2">
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="Name"
+              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+            />
+            <input
+              type="date"
+              value={editHeldAt}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setEditHeldAt(e.target.value)}
+              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+            />
+          </div>
           <div className="grid gap-3 md:grid-cols-2">
             <select
               value={editFormat}
@@ -661,6 +670,12 @@ export function Tournament() {
               className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
             />
           </div>
+          {tournament.status === 'ACTIVE' && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Changing planned rounds while the event is in progress is a local organizer workflow.
+              This is not standard for sanctioned fixed-round play.
+            </div>
+          )}
           <input
             value={editSubtitle}
             onChange={(e) => setEditSubtitle(e.target.value)}
@@ -908,6 +923,38 @@ export function Tournament() {
                   })
                   .finally(() => setLoading(false));
               }}
+              onAssignByOrder={
+                canRandomizeSeats
+                  ? () => {
+                      if (!id) return;
+                      setLoading(true);
+                      setError('');
+                      api
+                        .assignSeatsByOrder(id)
+                        .then(() => refresh())
+                        .catch((err) => {
+                          setError(err instanceof Error ? err.message : 'Error assigning seats');
+                        })
+                        .finally(() => setLoading(false));
+                    }
+                  : undefined
+              }
+              onReorderSeats={
+                canRandomizeSeats
+                  ? (assignments) => {
+                      if (!id) return;
+                      setLoading(true);
+                      setError('');
+                      api
+                        .updateSeatOrder(id, assignments)
+                        .then(() => refresh())
+                        .catch((err) => {
+                          setError(err instanceof Error ? err.message : 'Error reordering seats');
+                        })
+                        .finally(() => setLoading(false));
+                    }
+                  : undefined
+              }
             />
           )}
           <PlayerList

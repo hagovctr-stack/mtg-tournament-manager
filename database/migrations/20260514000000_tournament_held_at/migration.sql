@@ -1,0 +1,2 @@
+ALTER TABLE "Tournament"
+ADD COLUMN "heldAt" TIMESTAMP(3);

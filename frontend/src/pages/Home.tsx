@@ -28,11 +28,14 @@ const selectClass = fieldClass;
 
 function formatDate(value: string | null) {
   if (!value) return 'Never';
+  // Replace hyphens so the date is parsed as local time, not UTC midnight
+  // (avoids a one-day-behind shift in timezones west of UTC).
+  const localDate = new Date(value.slice(0, 10).replace(/-/g, '/'));
   return new Intl.DateTimeFormat(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
-  }).format(new Date(value));
+  }).format(localDate);
 }
 
 function formatPercent(value: number) {
@@ -152,6 +155,7 @@ export function Home() {
   const [tournamentLeagueId, setTournamentLeagueId] = useState('');
   const [teamMode, setTeamMode] = useState<TeamMode>('NONE');
   const [teamSetupTiming, setTeamSetupTiming] = useState<TeamSetupTiming>('BEFORE_DRAFT');
+  const [tournamentDate, setTournamentDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const [playerName, setPlayerName] = useState('');
   const [playerDci, setPlayerDci] = useState('');
@@ -315,6 +319,7 @@ export function Home() {
         leagueId: tournamentLeagueId || null,
         teamMode,
         teamSetupTiming,
+        heldAt: tournamentDate || null,
       };
       await api.createTournament(input);
       setTournamentName('');
@@ -323,6 +328,7 @@ export function Home() {
       setTournamentLeagueId('');
       setTeamMode('NONE');
       setTeamSetupTiming('BEFORE_DRAFT');
+      setTournamentDate(new Date().toISOString().slice(0, 10));
       await refreshHome();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error creating tournament');
@@ -402,17 +408,25 @@ export function Home() {
 
   const tournamentForm = (
     <form onSubmit={createTournament} className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <input
-          value={tournamentName}
-          onChange={(event) => setTournamentName(event.target.value)}
-          placeholder="Tournament name"
-          className={fieldClass}
-        />
+      <input
+        value={tournamentName}
+        onChange={(event) => setTournamentName(event.target.value)}
+        placeholder="Tournament name"
+        className={fieldClass}
+      />
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
+        <div />
         <input
           value={rounds}
           onChange={(event) => setRounds(event.target.value)}
           placeholder="Planned rounds"
+          className={fieldClass}
+        />
+        <input
+          type="date"
+          value={tournamentDate}
+          max={new Date().toISOString().slice(0, 10)}
+          onChange={(event) => setTournamentDate(event.target.value)}
           className={fieldClass}
         />
       </div>
@@ -800,7 +814,7 @@ export function Home() {
                     <span>
                       Round {tournament.currentRound}/{tournament.totalRounds || '?'}
                     </span>
-                    <span>{formatDate(tournament.updatedAt)}</span>
+                    <span>{formatDate(tournament.heldAt ?? tournament.updatedAt)}</span>
                   </div>
                 </Link>
               ))}
