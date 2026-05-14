@@ -488,10 +488,10 @@ export function PairingsTable({
                         <button
                           type="button"
                           onClick={() => openForm(match)}
-                          className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] transition ${
+                          className={`rounded-full border px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] transition ${
                             match.result === 'PENDING'
-                              ? 'bg-slate-950 text-white hover:bg-slate-800'
-                              : 'border border-stone-200 bg-white text-slate-600 hover:border-stone-300 hover:text-slate-900'
+                              ? 'border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700'
+                              : 'border-stone-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
                           }`}
                         >
                           {match.result === 'PENDING' ? 'Report' : 'Edit'}
