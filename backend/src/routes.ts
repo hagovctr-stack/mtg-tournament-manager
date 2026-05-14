@@ -117,6 +117,28 @@ router.post(
   }),
 );
 
+router.post(
+  '/tournaments/:id/assign-seats-by-order',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
+  wrap(async (req, res) => {
+    await svc.assignSeatsByOrder(req.params.id);
+    const tournament = await svc.getTournament(req.params.id, req.auth);
+    broadcast(req.params.id, 'tournament_updated', { tournamentId: req.params.id, tournament });
+    res.json(tournament);
+  }),
+);
+
+router.patch(
+  '/tournaments/:id/seats',
+  requireRole('ORG_ADMIN', 'ORGANIZER'),
+  wrap(async (req, res) => {
+    await svc.updateSeatAssignments(req.params.id, req.body.assignments);
+    const tournament = await svc.getTournament(req.params.id, req.auth);
+    broadcast(req.params.id, 'tournament_updated', { tournamentId: req.params.id, tournament });
+    res.json(tournament);
+  }),
+);
+
 router.get(
   '/players',
   wrap(async (req, res) => {

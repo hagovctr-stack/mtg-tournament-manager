@@ -9,6 +9,8 @@ interface DraftPodProps {
   canRandomize: boolean;
   isRandomizing: boolean;
   onRandomize: () => void;
+  onAssignByOrder?: () => void;
+  onReorderSeats?: (assignments: Array<{ tournamentPlayerId: string; seatNumber: number }>) => void;
   storageKey?: string;
 }
 
@@ -32,10 +34,16 @@ export function DraftPod({
   canRandomize,
   isRandomizing,
   onRandomize,
+  onAssignByOrder,
+  onReorderSeats,
   storageKey,
 }: DraftPodProps) {
   const [collapsed, setCollapsed] = useState(() =>
     storageKey ? localStorage.getItem(storageKey) === 'true' : false,
+  );
+  const [draggedTournamentPlayerId, setDraggedTournamentPlayerId] = useState<string | null>(null);
+  const [dropTargetTournamentPlayerId, setDropTargetTournamentPlayerId] = useState<string | null>(
+    null,
   );
   const activePlayers = players.filter((player) => player.active);
   const seatedPlayers = [...activePlayers]
@@ -61,17 +69,28 @@ export function DraftPod({
             <p className="mt-1 text-sm text-slate-600">
               {status === 'REGISTRATION'
                 ? 'Start the tournament to assign seats.'
-                : 'Randomize seats to lock the pod layout for round 1.'}
+                : 'Assign seats to lock the pod layout for round 1.'}
             </p>
           </div>
           {canRandomize && (
-            <button
-              onClick={onRandomize}
-              disabled={isRandomizing || activePlayers.length < 2}
-              className="rounded-2xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm hover:border-rose-300 hover:bg-rose-50 disabled:opacity-50"
-            >
-              {isRandomizing ? 'Randomizing...' : 'Randomize Seats'}
-            </button>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {onAssignByOrder && (
+                <button
+                  onClick={onAssignByOrder}
+                  disabled={isRandomizing || activePlayers.length < 2}
+                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Use Registration Order
+                </button>
+              )}
+              <button
+                onClick={onRandomize}
+                disabled={isRandomizing || activePlayers.length < 2}
+                className="rounded-2xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm hover:border-rose-300 hover:bg-rose-50 disabled:opacity-50"
+              >
+                {isRandomizing ? 'Randomizing...' : 'Randomize Seats'}
+              </button>
+            </div>
           )}
         </div>
       </section>
@@ -103,13 +122,24 @@ export function DraftPod({
             </button>
           )}
           {canRandomize && (
-            <button
-              onClick={onRandomize}
-              disabled={isRandomizing}
-              className="rounded-2xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm hover:border-rose-300 hover:bg-rose-50 disabled:opacity-50"
-            >
-              {isRandomizing ? 'Randomizing...' : 'Re-randomize'}
-            </button>
+            <div className="flex items-center gap-2">
+              {onAssignByOrder && (
+                <button
+                  onClick={onAssignByOrder}
+                  disabled={isRandomizing}
+                  className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Reset to Reg. Order
+                </button>
+              )}
+              <button
+                onClick={onRandomize}
+                disabled={isRandomizing}
+                className="rounded-2xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm hover:border-rose-300 hover:bg-rose-50 disabled:opacity-50"
+              >
+                {isRandomizing ? 'Randomizing...' : 'Re-randomize'}
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -133,6 +163,10 @@ export function DraftPod({
 
             {seatedPlayers.map((player, index) => {
               const { style, angle } = getSeatLayout(index, seatedPlayers.length);
+              const isDragging = draggedTournamentPlayerId === player.id;
+              const isDropTarget =
+                dropTargetTournamentPlayerId === player.id &&
+                draggedTournamentPlayerId !== player.id;
               return (
                 <SeatNode
                   key={player.id}
@@ -140,8 +174,45 @@ export function DraftPod({
                   name={player.name}
                   avatarUrl={player.avatarUrl}
                   playerId={player.playerId}
+                  tournamentPlayerId={player.id}
                   angle={angle}
                   style={style}
+                  draggable={Boolean(onReorderSeats)}
+                  isDragging={isDragging}
+                  isDropTarget={isDropTarget}
+                  onDragStart={() => setDraggedTournamentPlayerId(player.id)}
+                  onDragEnd={() => {
+                    setDraggedTournamentPlayerId(null);
+                    setDropTargetTournamentPlayerId(null);
+                  }}
+                  onDragOver={() => setDropTargetTournamentPlayerId(player.id)}
+                  onDragLeave={() =>
+                    setDropTargetTournamentPlayerId((current) =>
+                      current === player.id ? null : current,
+                    )
+                  }
+                  onDrop={() => {
+                    if (
+                      draggedTournamentPlayerId &&
+                      draggedTournamentPlayerId !== player.id &&
+                      onReorderSeats
+                    ) {
+                      const source = seatedPlayers.find((p) => p.id === draggedTournamentPlayerId);
+                      const target = player;
+                      if (source && target) {
+                        const assignments = seatedPlayers.map((p) => {
+                          if (p.id === source.id)
+                            return { tournamentPlayerId: p.id, seatNumber: target.seatNumber! };
+                          if (p.id === target.id)
+                            return { tournamentPlayerId: p.id, seatNumber: source.seatNumber! };
+                          return { tournamentPlayerId: p.id, seatNumber: p.seatNumber! };
+                        });
+                        onReorderSeats(assignments);
+                      }
+                    }
+                    setDraggedTournamentPlayerId(null);
+                    setDropTargetTournamentPlayerId(null);
+                  }}
                 />
               );
             })}
@@ -184,13 +255,30 @@ function SeatNode({
   playerId,
   angle,
   style,
+  draggable,
+  isDragging,
+  isDropTarget,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }: {
   seat: number;
   name: string;
   avatarUrl: string | null;
   playerId: string | null;
+  tournamentPlayerId: string;
   angle: number;
   style: CSSProperties;
+  draggable?: boolean;
+  isDragging?: boolean;
+  isDropTarget?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+  onDragOver?: () => void;
+  onDragLeave?: () => void;
+  onDrop?: () => void;
 }) {
   const { firstLine, secondLine } = splitDisplayName(name);
   const isUpperHalf = Math.sin((angle * Math.PI) / 180) < 0;
@@ -207,11 +295,15 @@ function SeatNode({
     >
       <div className="relative">
         {avatarUrl ? (
-          <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-white shadow-lg ring-2 ring-rose-300">
+          <div
+            className={`h-16 w-16 overflow-hidden rounded-full border-2 shadow-lg ring-2 transition ${isDropTarget ? 'border-rose-400 ring-rose-400 scale-110' : 'border-white ring-rose-300'}`}
+          >
             <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
           </div>
         ) : (
-          <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-white bg-rose-600 shadow-lg text-xl font-bold text-white">
+          <div
+            className={`flex h-16 w-16 items-center justify-center rounded-full border-2 shadow-lg text-xl font-bold text-white transition ${isDropTarget ? 'border-rose-400 bg-rose-400 scale-110' : 'border-white bg-rose-600'}`}
+          >
             {name.charAt(0).toUpperCase()}
           </div>
         )}
@@ -219,7 +311,9 @@ function SeatNode({
           {seat}
         </div>
       </div>
-      <div className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 shadow-xl shadow-slate-300/60">
+      <div
+        className={`w-full rounded-2xl border bg-white px-3 py-2 shadow-xl transition ${isDropTarget ? 'border-rose-300 shadow-rose-200' : 'border-slate-300 shadow-slate-300/60'}`}
+      >
         <p className="truncate text-xs font-semibold leading-tight text-slate-800" title={name}>
           {firstLine}
         </p>
@@ -229,9 +323,32 @@ function SeatNode({
       </div>
     </div>
   );
-  return (
-    <div className="absolute w-[120px] sm:w-[136px]" style={{ ...style, transform }}>
+
+  const wrapper = (
+    <div
+      draggable={draggable}
+      onDragStart={(e) => {
+        if (draggable) {
+          e.dataTransfer.effectAllowed = 'move';
+          onDragStart?.();
+        }
+      }}
+      onDragEnd={onDragEnd}
+      onDragOver={(e) => {
+        e.preventDefault();
+        onDragOver?.();
+      }}
+      onDragLeave={onDragLeave}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop?.();
+      }}
+      className={`absolute w-[120px] sm:w-[136px] transition-opacity ${isDragging ? 'opacity-40' : 'opacity-100'} ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      style={{ ...style, transform }}
+    >
       {playerId ? <Link to={`/players/${playerId}`}>{content}</Link> : content}
     </div>
   );
+
+  return wrapper;
 }
