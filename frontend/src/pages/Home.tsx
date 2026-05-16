@@ -408,14 +408,13 @@ export function Home() {
 
   const tournamentForm = (
     <form onSubmit={createTournament} className="space-y-4">
-      <input
-        value={tournamentName}
-        onChange={(event) => setTournamentName(event.target.value)}
-        placeholder="Tournament name"
-        className={fieldClass}
-      />
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
-        <div />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_8rem_13rem]">
+        <input
+          value={tournamentName}
+          onChange={(event) => setTournamentName(event.target.value)}
+          placeholder="Tournament name"
+          className={fieldClass}
+        />
         <input
           value={rounds}
           onChange={(event) => setRounds(event.target.value)}
