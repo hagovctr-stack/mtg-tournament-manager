@@ -21,6 +21,78 @@ import { StandingsTable } from '../components/StandingsTable';
 import { RoundSelector } from '../components/RoundSelector';
 import { Timer } from '../components/Timer';
 
+// ─── MTG 5-colour identity system ────────────────────────────────────────────
+const MTG_COLORS = [
+  { key: 'W', label: 'White',
+    accent: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200',
+    avatar: 'bg-amber-500 text-white', badge: 'bg-amber-50 text-amber-700 border-amber-200',
+    statsBar: 'bg-amber-50', pip: '#f59e0b' },
+  { key: 'U', label: 'Blue',
+    accent: 'text-sky-700', bg: 'bg-sky-50', border: 'border-sky-200',
+    avatar: 'bg-sky-700 text-white', badge: 'bg-sky-50 text-sky-700 border-sky-200',
+    statsBar: 'bg-sky-50', pip: '#0369a1' },
+  { key: 'B', label: 'Black',
+    accent: 'text-slate-950', bg: 'bg-slate-50', border: 'border-slate-300',
+    avatar: 'bg-slate-950 text-white', badge: 'bg-slate-50 text-slate-800 border-slate-300',
+    statsBar: 'bg-slate-50', pip: '#020617' },
+  { key: 'R', label: 'Red',
+    accent: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-200',
+    avatar: 'bg-rose-600 text-white', badge: 'bg-rose-50 text-rose-700 border-rose-200',
+    statsBar: 'bg-rose-50', pip: '#e11d48' },
+  { key: 'G', label: 'Green',
+    accent: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200',
+    avatar: 'bg-emerald-600 text-white', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    statsBar: 'bg-emerald-50', pip: '#059669' },
+] as const;
+
+type MtgColorKey = (typeof MTG_COLORS)[number]['key'];
+type MtgColor = (typeof MTG_COLORS)[number];
+const MTG_COLOR_KEYS = new Set<string>(MTG_COLORS.map((color) => color.key));
+
+function getMtgColor(key: MtgColorKey | undefined): MtgColor {
+  return MTG_COLORS.find((c) => c.key === key) ?? MTG_COLORS[1]!;
+}
+function pickRandomColors(): [MtgColorKey, MtgColorKey] {
+  const shuffled = [...MTG_COLORS].sort(() => Math.random() - 0.5);
+  return [shuffled[0]!.key, shuffled[1]!.key];
+}
+function loadTeamColors(key: string): [MtgColorKey, MtgColorKey] | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as unknown;
+    if (
+      Array.isArray(p) &&
+      p.length === 2 &&
+      typeof p[0] === 'string' &&
+      typeof p[1] === 'string' &&
+      MTG_COLOR_KEYS.has(p[0]) &&
+      MTG_COLOR_KEYS.has(p[1])
+    ) {
+      return p as [MtgColorKey, MtgColorKey];
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+function saveTeamColors(key: string, colors: [MtgColorKey, MtgColorKey]) {
+  try { localStorage.setItem(key, JSON.stringify(colors)); } catch { /* ignore */ }
+}
+function loadOrCreateTeamColors(key: string): [MtgColorKey, MtgColorKey] {
+  const saved = loadTeamColors(key);
+  if (saved) return saved;
+  const generated = pickRandomColors();
+  saveTeamColors(key, generated);
+  return generated;
+}
+
+function initialsFor(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0]!.slice(0, 1).toUpperCase();
+  return `${parts[0]!.slice(0, 1)}${parts[parts.length - 1]!.slice(0, 1)}`.toUpperCase();
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 type Tab = 'players' | 'pairings' | 'standings';
 
 const TEAM_EDITOR_SEEDS = [1, 2];
@@ -65,189 +137,6 @@ interface TeamSlot {
   tournamentPlayerId: string | null;
 }
 
-function TeamEditor({
-  teams,
-  players,
-  disabled,
-  onSave,
-}: {
-  teams: TournamentTeam[];
-  players: Player[];
-  disabled: boolean;
-  onSave: (
-    assignments: Array<{ teamSeed: number; tournamentPlayerId: string; seatOrder: number }>,
-  ) => Promise<void>;
-}) {
-  const playerById = useMemo(
-    () => new Map(players.map((player) => [player.id, player])),
-    [players],
-  );
-  const initialSlots = useMemo(() => buildInitialTeamSlots(players, teams), [players, teams]);
-  const [slots, setSlots] = useState<TeamSlot[]>(initialSlots);
-  const [draggedSlotKey, setDraggedSlotKey] = useState<string | null>(null);
-  const [dragOverSlotKey, setDragOverSlotKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSlots(initialSlots);
-  }, [initialSlots]);
-
-  const swapSlots = (sourceKey: string, targetKey: string) => {
-    if (sourceKey === targetKey) return;
-    setSlots((current) => {
-      const next = current.map((slot) => ({ ...slot }));
-      const source = next.find((slot) => slot.key === sourceKey);
-      const target = next.find((slot) => slot.key === targetKey);
-      if (!source || !target) return current;
-      [source.tournamentPlayerId, target.tournamentPlayerId] = [
-        target.tournamentPlayerId,
-        source.tournamentPlayerId,
-      ];
-      return next;
-    });
-  };
-
-  const allSlotsFilled = slots.every((slot) => slot.tournamentPlayerId);
-
-  return (
-    <div className="mt-4 rounded-[1.5rem] border border-amber-200 bg-[linear-gradient(180deg,#fff8ea_0%,#ffffff_100%)] p-5 shadow-[0_18px_45px_rgba(120,53,15,0.08)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.26em] text-amber-700">
-            Manual Team Layout
-          </p>
-          <p className="mt-2 text-sm text-slate-600">
-            Drag player cards between Team A and Team B. Board slots determine the fixed pairing
-            lane for the round sheet.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setSlots(initialSlots)}
-          disabled={disabled}
-          className="rounded-2xl border border-amber-200 bg-white px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-50 disabled:opacity-50"
-        >
-          Reset Layout
-        </button>
-      </div>
-
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        {TEAM_EDITOR_SEEDS.map((teamSeed) => (
-          <div
-            key={teamSeed}
-            className="rounded-[1.35rem] border border-slate-200 bg-white/90 p-4 shadow-[0_14px_30px_rgba(15,23,42,0.06)]"
-          >
-            <div className="flex items-center justify-between">
-              <p className="font-serif text-xl font-semibold tracking-tight text-slate-950">
-                Team {teamSeed === 1 ? 'A' : 'B'}
-              </p>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                3 Boards
-              </span>
-            </div>
-            <div className="mt-4 space-y-3">
-              {slots
-                .filter((slot) => slot.teamSeed === teamSeed)
-                .map((slot) => {
-                  const player = slot.tournamentPlayerId
-                    ? (playerById.get(slot.tournamentPlayerId) ?? null)
-                    : null;
-
-                  return (
-                    <div
-                      key={slot.key}
-                      onDragOver={(event) => {
-                        event.preventDefault();
-                        setDragOverSlotKey(slot.key);
-                      }}
-                      onDragLeave={() =>
-                        setDragOverSlotKey((current) => (current === slot.key ? null : current))
-                      }
-                      onDrop={(event) => {
-                        event.preventDefault();
-                        const sourceKey =
-                          draggedSlotKey || event.dataTransfer.getData('text/plain') || null;
-                        if (sourceKey) swapSlots(sourceKey, slot.key);
-                        setDraggedSlotKey(null);
-                        setDragOverSlotKey(null);
-                      }}
-                      className={`rounded-[1.2rem] border px-4 py-3 transition ${
-                        dragOverSlotKey === slot.key
-                          ? 'border-amber-400 bg-amber-50 shadow-[0_0_0_3px_rgba(251,191,36,0.18)]'
-                          : 'border-slate-200 bg-slate-50'
-                      }`}
-                    >
-                      <div className="mb-2 flex items-center justify-between text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-slate-500">
-                        <span>Board {slot.seatOrder}</span>
-                        <span>{player?.seatNumber ? `Seat ${player.seatNumber}` : 'Unseated'}</span>
-                      </div>
-                      <div
-                        draggable={Boolean(player) && !disabled}
-                        onDragStart={(event) => {
-                          if (!player) return;
-                          event.dataTransfer.effectAllowed = 'move';
-                          event.dataTransfer.setData('text/plain', slot.key);
-                          setDraggedSlotKey(slot.key);
-                        }}
-                        onDragEnd={() => {
-                          setDraggedSlotKey(null);
-                          setDragOverSlotKey(null);
-                        }}
-                        className={`rounded-[1rem] border border-white/80 bg-white px-4 py-3 shadow-sm transition ${
-                          disabled
-                            ? 'cursor-not-allowed opacity-60'
-                            : 'cursor-grab active:cursor-grabbing'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-slate-900">
-                              {player?.name ?? 'Empty Slot'}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {player?.seatNumber
-                                ? `Draft seat ${player.seatNumber}`
-                                : 'Drop a player here'}
-                            </p>
-                          </div>
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Drag
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <button
-        type="button"
-        onClick={() =>
-          void onSave(
-            slots.flatMap((slot) =>
-              slot.tournamentPlayerId
-                ? [
-                    {
-                      teamSeed: slot.teamSeed,
-                      tournamentPlayerId: slot.tournamentPlayerId,
-                      seatOrder: slot.seatOrder,
-                    },
-                  ]
-                : [],
-            ),
-          )
-        }
-        disabled={disabled || !allSlotsFilled}
-        className="mt-5 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
-      >
-        Save Team Assignments
-      </button>
-    </div>
-  );
-}
-
 export function Tournament() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -272,6 +161,30 @@ export function Tournament() {
   const [editTeamMode, setEditTeamMode] = useState<TeamMode>('NONE');
   const [editTeamSetupTiming, setEditTeamSetupTiming] = useState<TeamSetupTiming>('BEFORE_DRAFT');
   const [editHeldAt, setEditHeldAt] = useState('');
+
+  const teamColorsKey = `team-colors-${id ?? 'default'}`;
+  const [teamColors, setTeamColors] = useState<[MtgColorKey, MtgColorKey]>(() => {
+    return loadOrCreateTeamColors(`team-colors-${id ?? 'default'}`);
+  });
+  const [openPickerSlot, setOpenPickerSlot] = useState<0 | 1 | null>(null);
+  const [teamSlots, setTeamSlots] = useState<TeamSlot[]>([]);
+  const [draggedTeamSlotKey, setDraggedTeamSlotKey] = useState<string | null>(null);
+  const [dragOverTeamSlotKey, setDragOverTeamSlotKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTeamColors(loadOrCreateTeamColors(teamColorsKey));
+    setOpenPickerSlot(null);
+  }, [teamColorsKey]);
+
+  const setTeamColor = (slot: 0 | 1, key: MtgColorKey) => {
+    setTeamColors((prev) => {
+      const next: [MtgColorKey, MtgColorKey] = [...prev] as [MtgColorKey, MtgColorKey];
+      next[slot] = key;
+      saveTeamColors(teamColorsKey, next);
+      return next;
+    });
+    setOpenPickerSlot(null);
+  };
 
   const refresh = useCallback(async () => {
     if (!id) return;
@@ -334,6 +247,82 @@ export function Tournament() {
     );
   }, [selectedPairingsRoundNumber, tournament]);
 
+  const initialTeamSlots = useMemo(() => {
+    if (!tournament) return [];
+    return buildInitialTeamSlots(
+      tournament.players.filter((player) => player.active),
+      tournament.teams,
+    );
+  }, [tournament]);
+
+  const activePlayerById = useMemo(() => {
+    if (!tournament) return new Map<string, Player>();
+    return new Map(
+      tournament.players.filter((player) => player.active).map((player) => [player.id, player]),
+    );
+  }, [tournament]);
+
+  useEffect(() => {
+    setTeamSlots(initialTeamSlots);
+    setDraggedTeamSlotKey(null);
+    setDragOverTeamSlotKey(null);
+  }, [initialTeamSlots]);
+
+  const playerTeamColors = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (!tournament) return map;
+    tournament.teams.forEach((team, teamIndex) => {
+      const tc = getMtgColor(teamColors[teamIndex % teamColors.length]);
+      team.members.forEach((member) => {
+        map[member.tournamentPlayerId] = tc.pip;
+      });
+    });
+    return map;
+  }, [tournament, teamColors]);
+
+  const teamSlotsDirty = useMemo(() => {
+    if (teamSlots.length !== initialTeamSlots.length) return false;
+    return teamSlots.some(
+      (slot, index) => slot.tournamentPlayerId !== initialTeamSlots[index]?.tournamentPlayerId,
+    );
+  }, [initialTeamSlots, teamSlots]);
+
+  const swapTeamSlots = useCallback((sourceKey: string, targetKey: string) => {
+    if (sourceKey === targetKey) return;
+    setTeamSlots((current) => {
+      const next = current.map((slot) => ({ ...slot }));
+      const source = next.find((slot) => slot.key === sourceKey);
+      const target = next.find((slot) => slot.key === targetKey);
+      if (!source || !target) return current;
+      [source.tournamentPlayerId, target.tournamentPlayerId] = [
+        target.tournamentPlayerId,
+        source.tournamentPlayerId,
+      ];
+      return next;
+    });
+  }, []);
+
+  const saveTeamSlots = useCallback(async () => {
+    if (!id || teamSlots.some((slot) => !slot.tournamentPlayerId)) return;
+    setLoading(true);
+    setError('');
+    try {
+      await api.saveTeams(
+        id,
+        teamSlots.map((slot) => ({
+          teamSeed: slot.teamSeed,
+          tournamentPlayerId: slot.tournamentPlayerId!,
+          seatOrder: slot.seatOrder,
+        })),
+      );
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error saving teams');
+    } finally {
+      setLoading(false);
+    }
+  }, [id, refresh, teamSlots]);
+
   if (!tournament) {
     return <div className="py-16 text-center text-gray-400">Loading tournament…</div>;
   }
@@ -361,7 +350,11 @@ export function Tournament() {
     tournament.currentRound === 0 &&
     tournament.rounds.length === 0 &&
     (teamSetupBeforeDraft || hasSeatAssignments);
+  const canEditTeamCards =
+    teamDraftCanSetTeams && activePlayers.length === 6 && teamSlots.length === 6;
+  const allTeamSlotsFilled = teamSlots.every((slot) => slot.tournamentPlayerId);
   const allResultsIn = currentRound?.matches.every((match) => match.result !== 'PENDING') ?? false;
+
   const canGenerateRound =
     tournament.status === 'ACTIVE' &&
     (tournament.currentRound === 0 || allResultsIn) &&
@@ -763,6 +756,24 @@ export function Tournament() {
             </div>
             {teamDraftCanSetTeams && (
               <div className="flex flex-wrap items-center gap-2">
+                {canEditTeamCards && teamSlotsDirty && (
+                  <>
+                    <button
+                      onClick={() => void saveTeamSlots()}
+                      className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                      disabled={loading || !allTeamSlotsFilled}
+                    >
+                      Save Teams
+                    </button>
+                    <button
+                      onClick={() => setTeamSlots(initialTeamSlots)}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                      disabled={loading}
+                    >
+                      Reset
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={async () => {
                     if (!id) return;
@@ -807,80 +818,159 @@ export function Tournament() {
           )}
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {tournament.teams.map((team) => (
-              <div
-                key={team.id}
-                className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4"
-              >
-                <p className="text-sm font-semibold text-slate-900">{team.name}</p>
-                <div className="mt-3 space-y-2">
-                  {team.members.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center justify-between text-sm text-slate-700"
-                    >
-                      <span>
-                        Board {member.seatOrder} · {member.player.name}
-                      </span>
-                      <span className="text-slate-400">Seat {member.player.seatNumber ?? '—'}</span>
+            {tournament.teams.map((team, teamIndex) => {
+              const slot = (teamIndex % teamColors.length) as 0 | 1;
+              const tc = getMtgColor(teamColors[slot]);
+              const standing = tournament.teamStandings.find((s) => s.team.id === team.id);
+              const teamRows = canEditTeamCards
+                ? teamSlots
+                    .filter((teamSlot) => teamSlot.teamSeed === team.seed)
+                    .map((teamSlot) => ({
+                      key: teamSlot.key,
+                      player: teamSlot.tournamentPlayerId
+                        ? (activePlayerById.get(teamSlot.tournamentPlayerId) ?? null)
+                        : null,
+                      slotKey: teamSlot.key,
+                    }))
+                : team.members.map((member) => ({
+                    key: member.id,
+                    player: member.player,
+                    slotKey: null,
+                  }));
+              return (
+                <div key={team.id} className={`rounded-[1.35rem] border ${tc.border} overflow-hidden shadow-[0_6px_24px_rgba(15,23,42,0.07)]`}>
+                  {/* Header with color picker */}
+                  <div className={`${tc.bg} border-b ${tc.border} px-4 py-3 flex items-center justify-between`}>
+                    <div className="flex items-center gap-2">
+                      <p className={`font-semibold text-sm ${tc.accent}`}>{team.name}</p>
                     </div>
-                  ))}
+                    {/* Mana pip color picker */}
+                    <div className="relative flex items-center">
+                      {openPickerSlot === slot ? (
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full bg-white/95 p-1 shadow-lg ring-1 ring-slate-900/10 z-10">
+                          {MTG_COLORS.map((c) => (
+                            <button
+                              key={c.key}
+                              title={c.label}
+                              onClick={() => setTeamColor(slot, c.key)}
+                              style={{ background: c.pip }}
+                              className={`h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 ${
+                                teamColors[slot] === c.key ? 'border-slate-800 scale-110' : 'border-white'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <button
+                          title="Change team color"
+                          onClick={() => setOpenPickerSlot(slot)}
+                          style={{ background: tc.pip }}
+                          className="h-5 w-5 rounded-full border-2 border-white/60 transition-transform hover:scale-110"
+                        />
+                      )}
+                    </div>
+                  </div>
+                  {/* Player rows */}
+                  <div className="bg-white p-3 space-y-1">
+                    {teamRows.map(({ key, player, slotKey }) => {
+                      const isDropTarget =
+                        Boolean(slotKey) &&
+                        dragOverTeamSlotKey === slotKey &&
+                        draggedTeamSlotKey !== slotKey;
+                      return (
+                        <div
+                          key={key}
+                          onDragOver={
+                            slotKey
+                              ? (event) => {
+                                  event.preventDefault();
+                                  setDragOverTeamSlotKey(slotKey);
+                                }
+                              : undefined
+                          }
+                          onDragLeave={
+                            slotKey
+                              ? () =>
+                                  setDragOverTeamSlotKey((current) =>
+                                    current === slotKey ? null : current,
+                                  )
+                              : undefined
+                          }
+                          onDrop={
+                            slotKey
+                              ? (event) => {
+                                  event.preventDefault();
+                                  const sourceKey =
+                                    draggedTeamSlotKey ||
+                                    event.dataTransfer.getData('text/plain') ||
+                                    null;
+                                  if (sourceKey) swapTeamSlots(sourceKey, slotKey);
+                                  setDraggedTeamSlotKey(null);
+                                  setDragOverTeamSlotKey(null);
+                                }
+                              : undefined
+                          }
+                          className={`flex items-center gap-3 rounded-xl px-3 py-2 transition ${
+                            isDropTarget ? `${tc.bg} ring-2 ring-inset ring-slate-200` : 'hover:bg-slate-50'
+                          } ${canEditTeamCards ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                          draggable={Boolean(canEditTeamCards && player && slotKey)}
+                          onDragStart={(event) => {
+                            if (!slotKey || !player) return;
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', slotKey);
+                            setDraggedTeamSlotKey(slotKey);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedTeamSlotKey(null);
+                            setDragOverTeamSlotKey(null);
+                          }}
+                        >
+                          {player ? (
+                            <>
+                              {player.avatarUrl
+                                ? <img src={player.avatarUrl} alt={player.name} className="h-8 w-8 rounded-full object-cover shrink-0 border-2 border-white shadow-sm" />
+                                : <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[0.65rem] font-bold ${tc.avatar} shadow-sm`}>{initialsFor(player.name)}</div>
+                              }
+                              <span className="flex-1 text-sm font-medium text-slate-800">{player.name}</span>
+                              {player.seatNumber && (
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-semibold text-slate-500">#{player.seatNumber}</span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <div className="h-8 w-8 shrink-0 rounded-full border border-dashed border-slate-300 bg-white" />
+                              <span className="flex-1 text-sm font-medium text-slate-400">Drop player here</span>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Merged standings footer */}
+                  {standing && (
+                    <div className={`border-t ${tc.border} ${tc.statsBar} px-4 py-2.5 grid grid-cols-4 divide-x divide-slate-200/60`}>
+                      <div className="text-center">
+                        <p className={`text-base font-bold ${tc.accent}`}>#{standing.rank}</p>
+                        <p className="text-[0.62rem] uppercase tracking-wide text-slate-400 font-semibold">Rank</p>
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-base font-bold ${tc.accent}`}>{standing.matchPoints}</p>
+                        <p className="text-[0.62rem] uppercase tracking-wide text-slate-400 font-semibold">MP</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-slate-600">{standing.roundWins}–{standing.roundLosses}–{standing.roundDraws}</p>
+                        <p className="text-[0.62rem] uppercase tracking-wide text-slate-400 font-semibold">Rounds</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-slate-600">{standing.boardWins}–{standing.boardLosses}–{standing.boardDraws}</p>
+                        <p className="text-[0.62rem] uppercase tracking-wide text-slate-400 font-semibold">Boards</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-
-          {tournament.teamStandings.length > 0 && (
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-100 text-left text-xs uppercase text-slate-500">
-                    <th className="px-3 py-2">Rank</th>
-                    <th className="px-3 py-2">Team</th>
-                    <th className="px-3 py-2">MP</th>
-                    <th className="px-3 py-2">Rounds</th>
-                    <th className="px-3 py-2">Boards</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tournament.teamStandings.map((standing) => (
-                    <tr key={standing.id} className="border-t border-slate-100">
-                      <td className="px-3 py-2 font-semibold text-slate-900">{standing.rank}</td>
-                      <td className="px-3 py-2 text-slate-800">{standing.team.name}</td>
-                      <td className="px-3 py-2 text-slate-800">{standing.matchPoints}</td>
-                      <td className="px-3 py-2 text-slate-600">
-                        {standing.roundWins}-{standing.roundLosses}-{standing.roundDraws}
-                      </td>
-                      <td className="px-3 py-2 text-slate-600">
-                        {standing.boardWins}-{standing.boardLosses}-{standing.boardDraws}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {teamDraftCanSetTeams && activePlayers.length === 6 && (
-            <TeamEditor
-              teams={tournament.teams}
-              players={activePlayers}
-              disabled={loading}
-              onSave={async (assignments) => {
-                if (!id) return;
-                setLoading(true);
-                setError('');
-                try {
-                  await api.saveTeams(id, assignments);
-                  await refresh();
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : 'Error saving teams');
-                } finally {
-                  setLoading(false);
-                }
-              }}
-            />
-          )}
         </section>
       )}
 
@@ -911,6 +1001,7 @@ export function Tournament() {
               canRandomize={canRandomizeSeats}
               isRandomizing={loading}
               storageKey={`draft-pod-collapsed-${id}`}
+              assignByOrderLabel={isTeamDraft && teamSetupBeforeDraft ? 'Use Team Order' : undefined}
               onRandomize={() => {
                 if (!id) return;
                 setLoading(true);
@@ -955,6 +1046,7 @@ export function Tournament() {
                     }
                   : undefined
               }
+              playerTeamColors={playerTeamColors}
             />
           )}
           <PlayerList
@@ -989,6 +1081,7 @@ export function Tournament() {
                   onSelect={setSelectedPairingsRoundNumber}
                 />
               }
+              playerTeamColors={playerTeamColors}
             />
           ) : (
             <p className="py-8 text-center text-sm text-slate-400">No pairings yet.</p>
@@ -1007,6 +1100,7 @@ export function Tournament() {
               .sort((left, right) => left - right)}
             finished={tournament.status === 'FINISHED'}
             isTeamDraft={tournament.teamMode === 'TEAM_DRAFT_3V3'}
+            playerTeamColors={playerTeamColors}
           />
         </section>
       )}

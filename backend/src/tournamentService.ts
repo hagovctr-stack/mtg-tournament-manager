@@ -567,6 +567,14 @@ export async function assignSeatsByOrder(tournamentId: string) {
     include: {
       players: { where: { active: true }, orderBy: { id: 'asc' } },
       rounds: { select: { id: true } },
+      teams: {
+        orderBy: { seed: 'asc' },
+        include: {
+          members: {
+            orderBy: { seatOrder: 'asc' },
+          },
+        },
+      },
     },
   });
   if (!tournament) throw new Error('Tournament not found');
@@ -580,6 +588,33 @@ export async function assignSeatsByOrder(tournamentId: string) {
     throw new Error('Seats are locked once round 1 has been created');
   }
   validateTournamentPlayerCount(tournament.format, tournament.players.length);
+
+  if (
+    usesTeamDraftMode(tournament.teamMode) &&
+    usesBeforeDraftTeamSetup((tournament as any).teamSetupTiming ?? 'BEFORE_DRAFT') &&
+    tournament.teams.length === 2 &&
+    tournament.teams.every((team) => team.members.length === 3)
+  ) {
+    const [leftTeam, rightTeam] = tournament.teams;
+    const assignments = leftTeam.members.flatMap((leftMember, index) => [
+      { tournamentPlayerId: leftMember.tournamentPlayerId, seatNumber: index * 2 + 1 },
+      {
+        tournamentPlayerId: rightTeam.members[index]!.tournamentPlayerId,
+        seatNumber: index * 2 + 2,
+      },
+    ]);
+
+    await prisma.$transaction(
+      assignments.map((assignment) =>
+        prisma.tournamentPlayer.update({
+          where: { id: assignment.tournamentPlayerId },
+          data: { seatNumber: assignment.seatNumber },
+        }),
+      ),
+    );
+
+    return { seated: assignments.length };
+  }
 
   await prisma.$transaction(
     tournament.players.map((player, index) =>

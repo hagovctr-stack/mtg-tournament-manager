@@ -10,8 +10,11 @@ interface DraftPodProps {
   isRandomizing: boolean;
   onRandomize: () => void;
   onAssignByOrder?: () => void;
+  assignByOrderLabel?: string;
   onReorderSeats?: (assignments: Array<{ tournamentPlayerId: string; seatNumber: number }>) => void;
   storageKey?: string;
+  /** Map of tournamentPlayerId → hex pip color for team identity rings */
+  playerTeamColors?: Record<string, string>;
 }
 
 const TABLE_RADIUS_BY_COUNT: Record<number, number> = {
@@ -35,8 +38,10 @@ export function DraftPod({
   isRandomizing,
   onRandomize,
   onAssignByOrder,
+  assignByOrderLabel = 'Use Registration Order',
   onReorderSeats,
   storageKey,
+  playerTeamColors,
 }: DraftPodProps) {
   const [collapsed, setCollapsed] = useState(() =>
     storageKey ? localStorage.getItem(storageKey) === 'true' : false,
@@ -80,7 +85,7 @@ export function DraftPod({
                   disabled={isRandomizing || activePlayers.length < 2}
                   className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
                 >
-                  Use Registration Order
+                  {assignByOrderLabel}
                 </button>
               )}
               <button
@@ -129,7 +134,9 @@ export function DraftPod({
                   disabled={isRandomizing}
                   className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
                 >
-                  Reset to Reg. Order
+                  {assignByOrderLabel === 'Use Registration Order'
+                    ? 'Reset to Reg. Order'
+                    : assignByOrderLabel}
                 </button>
               )}
               <button
@@ -180,6 +187,7 @@ export function DraftPod({
                   draggable={Boolean(onReorderSeats)}
                   isDragging={isDragging}
                   isDropTarget={isDropTarget}
+                  teamColor={playerTeamColors?.[player.id]}
                   onDragStart={() => setDraggedTournamentPlayerId(player.id)}
                   onDragEnd={() => {
                     setDraggedTournamentPlayerId(null);
@@ -258,6 +266,7 @@ function SeatNode({
   draggable,
   isDragging,
   isDropTarget,
+  teamColor,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -274,6 +283,7 @@ function SeatNode({
   draggable?: boolean;
   isDragging?: boolean;
   isDropTarget?: boolean;
+  teamColor?: string;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onDragOver?: () => void;
@@ -297,12 +307,14 @@ function SeatNode({
         {avatarUrl ? (
           <div
             className={`h-16 w-16 overflow-hidden rounded-full border-2 shadow-lg ring-2 transition ${isDropTarget ? 'border-rose-400 ring-rose-400 scale-110' : 'border-white ring-rose-300'}`}
+            style={teamColor && !isDropTarget ? { boxShadow: `0 0 0 2px white, 0 0 0 4px ${teamColor}66`, borderColor: 'white' } : undefined}
           >
             <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
           </div>
         ) : (
           <div
-            className={`flex h-16 w-16 items-center justify-center rounded-full border-2 shadow-lg text-xl font-bold text-white transition ${isDropTarget ? 'border-rose-400 bg-rose-400 scale-110' : 'border-white bg-rose-600'}`}
+            className={`flex h-16 w-16 items-center justify-center rounded-full border-2 shadow-lg text-xl font-bold text-white transition ${isDropTarget ? 'border-rose-400 bg-rose-400 scale-110' : 'border-white'}`}
+            style={teamColor && !isDropTarget ? { backgroundColor: teamColor, boxShadow: `0 0 0 2px white, 0 0 0 4px ${teamColor}55` } : { backgroundColor: '#e11d48' }}
           >
             {name.charAt(0).toUpperCase()}
           </div>
