@@ -40,7 +40,7 @@ function Stepper({
   disabled?: boolean;
 }) {
   return (
-    <div className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-1 py-1">
+    <div className="inline-flex h-8 items-center gap-1 rounded-full border border-stone-200 bg-white px-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
@@ -101,8 +101,8 @@ function WinnerMarker({ active }: { active: boolean }) {
   return (
     <span
       aria-hidden="true"
-      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center text-[1.08rem] leading-none ${
-        active ? 'text-amber-500' : 'text-transparent'
+      className={`inline-flex h-8 w-7 shrink-0 items-center justify-center text-[1.08rem] leading-none transition ${
+        active ? 'text-amber-500 opacity-100' : 'text-amber-500 opacity-0'
       }`}
     >
       ★
@@ -125,7 +125,12 @@ function PlayerCell({
     <div
       className={`flex min-w-0 items-center gap-2 ${align === 'right' ? 'flex-row-reverse text-right' : ''}`}
     >
-      <PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} size="sm" ringColor={ringColor} />
+      <PlayerAvatar
+        name={player.name}
+        avatarUrl={player.avatarUrl}
+        size="sm"
+        ringColor={ringColor}
+      />
       <span
         className={`truncate text-sm font-medium ${isWinner ? 'text-emerald-700' : 'text-slate-800'}`}
       >
@@ -169,7 +174,12 @@ function PlayerChoiceButton({
     <div
       className={`flex min-w-0 items-center gap-2 ${align === 'right' ? 'flex-row-reverse text-right' : ''}`}
     >
-      <PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} size="sm" ringColor={ringColor} />
+      <PlayerAvatar
+        name={player.name}
+        avatarUrl={player.avatarUrl}
+        size="sm"
+        ringColor={ringColor}
+      />
       <span className="truncate text-sm font-medium text-slate-800 transition group-hover:text-emerald-700">
         {player.name}
       </span>
@@ -181,15 +191,21 @@ function PlayerChoiceButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`group flex min-w-0 items-center gap-2 transition disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`group flex h-8 min-w-0 cursor-pointer items-center gap-2 rounded-md transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 ${
         align === 'right' ? 'ml-auto justify-end' : ''
       }`}
     >
       {align === 'left' && <WinnerMarker active={false} />}
-      <span className="min-w-0">{body}</span>
+      <span className="min-w-0 decoration-emerald-500 decoration-2 underline-offset-4 transition group-hover:text-emerald-700 group-hover:underline">
+        {body}
+      </span>
       {align === 'right' && <WinnerMarker active={false} />}
     </button>
   );
+}
+
+function ActionSlot({ children }: { children: React.ReactNode }) {
+  return <div className="ml-auto flex h-8 w-20 items-center justify-end">{children}</div>;
 }
 
 interface PairingsTableProps {
@@ -324,7 +340,7 @@ export function PairingsTable({
             type="button"
             onClick={() => void handleWinnerSelect(match, 'draw')}
             disabled={isSubmitting}
-            className="inline-flex items-center rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-600 transition hover:border-slate-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-8 items-center rounded-full border border-stone-200 bg-stone-50 px-3 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-600 transition hover:border-slate-300 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Draw
           </button>
@@ -343,14 +359,16 @@ export function PairingsTable({
           />
         ) : null,
         actionCell: (
-          <button
-            type="button"
-            onClick={closeForm}
-            disabled={isSubmitting}
-            className="rounded-full border border-stone-200 bg-white px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Cancel
-          </button>
+          <ActionSlot>
+            <button
+              type="button"
+              onClick={closeForm}
+              disabled={isSubmitting}
+              className="inline-flex h-8 w-20 items-center justify-center rounded-full border border-stone-200 bg-white text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-slate-500 transition hover:border-slate-300 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </ActionSlot>
         ),
       };
     }
@@ -364,10 +382,15 @@ export function PairingsTable({
 
     return {
       p1Cell: (
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex h-8 min-w-0 items-center gap-2">
           <WinnerMarker active={p1Highlighted} />
           <div className="flex min-w-0 items-center gap-2">
-            <PlayerAvatar name={match.player1.name} avatarUrl={match.player1.avatarUrl} size="sm" ringColor={playerTeamColors?.[match.player1.tournamentPlayerId ?? '']} />
+            <PlayerAvatar
+              name={match.player1.name}
+              avatarUrl={match.player1.avatarUrl}
+              size="sm"
+              ringColor={playerTeamColors?.[match.player1.tournamentPlayerId ?? '']}
+            />
             <span
               className={`truncate text-sm font-medium ${p1Highlighted ? 'text-emerald-700' : 'text-slate-400'}`}
             >
@@ -377,7 +400,7 @@ export function PairingsTable({
         </div>
       ),
       resultCell: (
-        <div className="flex items-center justify-center gap-1.5">
+        <div className="flex h-8 items-center justify-center gap-1.5">
           {selectedWinner === 'draw' ? (
             <Stepper
               value={winsW}
@@ -411,43 +434,77 @@ export function PairingsTable({
         </div>
       ),
       p2Cell: match.player2 ? (
-        <div className="flex min-w-0 items-center justify-end gap-2">
+        <div className="flex h-8 min-w-0 items-center justify-end gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <span
               className={`truncate text-sm font-medium ${p2Highlighted ? 'text-emerald-700' : 'text-slate-400'}`}
             >
               {p2Name}
             </span>
-            <PlayerAvatar name={match.player2.name} avatarUrl={match.player2.avatarUrl} size="sm" ringColor={playerTeamColors?.[match.player2.tournamentPlayerId ?? '']} />
+            <PlayerAvatar
+              name={match.player2.name}
+              avatarUrl={match.player2.avatarUrl}
+              size="sm"
+              ringColor={playerTeamColors?.[match.player2.tournamentPlayerId ?? '']}
+            />
           </div>
           <WinnerMarker active={p2Highlighted} />
         </div>
       ) : null,
       actionCell: (
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={handleBack}
-            disabled={isSubmitting}
-            className="text-xs font-semibold text-slate-400 transition hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Back
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              void handleSubmit(
-                match.id,
-                selectedWinner === 'draw' ? winsW : leftWins,
-                selectedWinner === 'draw' ? winsL : rightWins,
-              )
-            }
-            disabled={isSubmitting}
-            className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isSubmitting ? 'Saving…' : 'Save'}
-          </button>
-        </div>
+        <ActionSlot>
+          <div className="flex h-8 w-full items-center justify-around gap-2">
+            <button
+              type="button"
+              onClick={handleBack}
+              disabled={isSubmitting}
+              aria-label="Back"
+              title="Back"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-white text-slate-500 transition hover:border-slate-300 hover:bg-stone-50 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+              >
+                <path d="M9 14 4 9l5-5" />
+                <path d="M4 9h10a6 6 0 0 1 0 12h-1" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                void handleSubmit(
+                  match.id,
+                  selectedWinner === 'draw' ? winsW : leftWins,
+                  selectedWinner === 'draw' ? winsL : rightWins,
+                )
+              }
+              disabled={isSubmitting}
+              aria-label="Save result"
+              title="Save result"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-white transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2.4"
+              >
+                <path d="m5 12 4 4L19 6" />
+              </svg>
+            </button>
+          </div>
+        </ActionSlot>
       ),
     };
   };
@@ -479,9 +536,9 @@ export function PairingsTable({
             <tr className="text-left text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
               <th className="w-20 px-6 py-3">Table</th>
               <th className="pl-[3.5rem] pr-5 py-3">Player 1</th>
-              <th className="w-36 px-4 py-3 text-center">Result</th>
+              <th className="w-52 px-4 py-3 text-center">Result</th>
               <th className="pl-5 pr-[3.5rem] py-3 text-right">Player 2</th>
-              {canReport && <th className="w-28 pl-5 pr-6 py-3 text-right">Action</th>}
+              {canReport && <th className="w-36 pl-5 pr-6 py-3 text-right">Action</th>}
             </tr>
           </thead>
           <tbody>
@@ -493,26 +550,36 @@ export function PairingsTable({
               return (
                 <tr
                   key={match.id}
-                  className={`border-b border-stone-100 text-sm transition ${isEditing ? 'bg-stone-50/70' : 'hover:bg-stone-50/55'}`}
+                  className={`h-16 border-b border-stone-100 text-sm transition ${isEditing ? 'bg-stone-50/70' : 'hover:bg-stone-50/55'}`}
                 >
-                  <td className="px-6 py-4 font-mono text-sm text-slate-400">
+                  <td className="h-16 px-6 py-0 align-middle font-mono text-sm text-slate-400">
                     {match.tableNumber}
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="h-16 px-5 py-0 align-middle">
                     {editor ? (
                       editor.p1Cell
                     ) : (
-                      <PlayerCell player={match.player1} align="left" isWinner={winner === 'p1'} ringColor={playerTeamColors?.[match.player1.tournamentPlayerId ?? '']} />
+                      <PlayerCell
+                        player={match.player1}
+                        align="left"
+                        isWinner={winner === 'p1'}
+                        ringColor={playerTeamColors?.[match.player1.tournamentPlayerId ?? '']}
+                      />
                     )}
                   </td>
-                  <td className="px-4 py-4 text-center">
+                  <td className="h-16 px-4 py-0 text-center align-middle">
                     {editor ? editor.resultCell : <ResultBadge match={match} />}
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="h-16 px-5 py-0 align-middle">
                     {editor ? (
                       editor.p2Cell
                     ) : match.player2 ? (
-                      <PlayerCell player={match.player2} align="right" isWinner={winner === 'p2'} ringColor={playerTeamColors?.[match.player2.tournamentPlayerId ?? '']} />
+                      <PlayerCell
+                        player={match.player2}
+                        align="right"
+                        isWinner={winner === 'p2'}
+                        ringColor={playerTeamColors?.[match.player2.tournamentPlayerId ?? '']}
+                      />
                     ) : (
                       <div className="flex items-center justify-end gap-2 text-sm text-slate-400">
                         <span>Bye</span>
@@ -520,22 +587,26 @@ export function PairingsTable({
                     )}
                   </td>
                   {canReport && (
-                    <td className="pl-5 pr-6 py-4 text-right">
-                      {editor ? (
-                        editor.actionCell
-                      ) : match.result !== 'BYE' ? (
-                        <button
-                          type="button"
-                          onClick={() => openForm(match)}
-                          className={`rounded-full border px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] transition ${
-                            match.result === 'PENDING'
-                              ? 'border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700'
-                              : 'border-stone-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
-                          }`}
-                        >
-                          {match.result === 'PENDING' ? 'Report' : 'Edit'}
-                        </button>
-                      ) : null}
+                    <td className="h-16 pl-5 pr-6 py-0 text-right align-middle">
+                      <div className="flex h-16 items-center justify-end">
+                        {editor ? (
+                          editor.actionCell
+                        ) : match.result !== 'BYE' ? (
+                          <ActionSlot>
+                            <button
+                              type="button"
+                              onClick={() => openForm(match)}
+                              className={`inline-flex h-8 w-20 items-center justify-center rounded-full border text-[0.68rem] font-semibold uppercase tracking-[0.16em] transition ${
+                                match.result === 'PENDING'
+                                  ? 'border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700'
+                                  : 'border-stone-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                              }`}
+                            >
+                              {match.result === 'PENDING' ? 'Report' : 'Edit'}
+                            </button>
+                          </ActionSlot>
+                        ) : null}
+                      </div>
                     </td>
                   )}
                 </tr>
