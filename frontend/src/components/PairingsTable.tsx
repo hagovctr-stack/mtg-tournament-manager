@@ -152,6 +152,46 @@ function PlayerCell({
   );
 }
 
+function PlayerChoiceButton({
+  player,
+  align,
+  ringColor,
+  onClick,
+  disabled,
+}: {
+  player: MatchPlayer;
+  align: 'left' | 'right';
+  ringColor?: string;
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  const body = (
+    <div
+      className={`flex min-w-0 items-center gap-2 ${align === 'right' ? 'flex-row-reverse text-right' : ''}`}
+    >
+      <PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} size="sm" ringColor={ringColor} />
+      <span className="truncate text-sm font-medium text-slate-800 transition group-hover:text-emerald-700">
+        {player.name}
+      </span>
+    </div>
+  );
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`group flex min-w-0 items-center gap-2 transition disabled:cursor-not-allowed disabled:opacity-50 ${
+        align === 'right' ? 'ml-auto justify-end' : ''
+      }`}
+    >
+      {align === 'left' && <WinnerMarker active={false} />}
+      <span className="min-w-0">{body}</span>
+      {align === 'right' && <WinnerMarker active={false} />}
+    </button>
+  );
+}
+
 interface PairingsTableProps {
   matches: MatchDetail[];
   canReport: boolean;
@@ -269,19 +309,15 @@ export function PairingsTable({
 
     // Phase 1 — pick a winner
     if (selectedWinner === null) {
-      const btnBase =
-        'flex min-w-0 items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50';
       return {
         p1Cell: (
-          <button
-            type="button"
+          <PlayerChoiceButton
+            player={match.player1}
+            align="left"
+            ringColor={playerTeamColors?.[match.player1.tournamentPlayerId ?? '']}
             onClick={() => void handleWinnerSelect(match, 'p1')}
             disabled={isSubmitting}
-            className={`${btnBase} border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50`}
-          >
-            <PlayerAvatar name={match.player1.name} avatarUrl={match.player1.avatarUrl} size="sm" ringColor={playerTeamColors?.[match.player1.tournamentPlayerId ?? '']} />
-            <span className="truncate">{p1Name}</span>
-          </button>
+          />
         ),
         resultCell: showDraw ? (
           <button
@@ -298,15 +334,13 @@ export function PairingsTable({
           </span>
         ),
         p2Cell: match.player2 ? (
-          <button
-            type="button"
+          <PlayerChoiceButton
+            player={match.player2}
+            align="right"
+            ringColor={playerTeamColors?.[match.player2.tournamentPlayerId ?? '']}
             onClick={() => void handleWinnerSelect(match, 'p2')}
             disabled={isSubmitting}
-            className={`${btnBase} ml-auto border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50`}
-          >
-            <span className="truncate">{p2Name}</span>
-            <PlayerAvatar name={match.player2.name} avatarUrl={match.player2.avatarUrl} size="sm" ringColor={playerTeamColors?.[match.player2.tournamentPlayerId ?? '']} />
-          </button>
+          />
         ) : null,
         actionCell: (
           <button
