@@ -114,16 +114,18 @@ function PlayerCell({
   player,
   align,
   isWinner,
+  ringColor,
 }: {
   player: MatchPlayer;
   align: 'left' | 'right';
   isWinner: boolean;
+  ringColor?: string;
 }) {
   const body = (
     <div
       className={`flex min-w-0 items-center gap-2 ${align === 'right' ? 'flex-row-reverse text-right' : ''}`}
     >
-      <PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} size="sm" />
+      <PlayerAvatar name={player.name} avatarUrl={player.avatarUrl} size="sm" ringColor={ringColor} />
       <span
         className={`truncate text-sm font-medium ${isWinner ? 'text-emerald-700' : 'text-slate-800'}`}
       >
@@ -156,6 +158,8 @@ interface PairingsTableProps {
   bestOfFormat?: string;
   onUpdate: () => void;
   headerRight?: React.ReactNode;
+  /** Map of tournamentPlayerId → hex pip color for team identity rings */
+  playerTeamColors?: Record<string, string>;
 }
 
 export function PairingsTable({
@@ -164,6 +168,7 @@ export function PairingsTable({
   bestOfFormat = 'BO3',
   onUpdate,
   headerRight,
+  playerTeamColors,
 }: PairingsTableProps) {
   const maxW = maxWinsForFormat(bestOfFormat);
   const defaultWinsW = maxW === 99 ? 2 : maxW;
@@ -274,7 +279,7 @@ export function PairingsTable({
             disabled={isSubmitting}
             className={`${btnBase} border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50`}
           >
-            <PlayerAvatar name={match.player1.name} avatarUrl={match.player1.avatarUrl} size="sm" />
+            <PlayerAvatar name={match.player1.name} avatarUrl={match.player1.avatarUrl} size="sm" ringColor={playerTeamColors?.[match.player1.tournamentPlayerId ?? '']} />
             <span className="truncate">{p1Name}</span>
           </button>
         ),
@@ -300,7 +305,7 @@ export function PairingsTable({
             className={`${btnBase} ml-auto border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50`}
           >
             <span className="truncate">{p2Name}</span>
-            <PlayerAvatar name={match.player2.name} avatarUrl={match.player2.avatarUrl} size="sm" />
+            <PlayerAvatar name={match.player2.name} avatarUrl={match.player2.avatarUrl} size="sm" ringColor={playerTeamColors?.[match.player2.tournamentPlayerId ?? '']} />
           </button>
         ) : null,
         actionCell: (
@@ -328,7 +333,7 @@ export function PairingsTable({
         <div className="flex min-w-0 items-center gap-2">
           <WinnerMarker active={p1Highlighted} />
           <div className="flex min-w-0 items-center gap-2">
-            <PlayerAvatar name={match.player1.name} avatarUrl={match.player1.avatarUrl} size="sm" />
+            <PlayerAvatar name={match.player1.name} avatarUrl={match.player1.avatarUrl} size="sm" ringColor={playerTeamColors?.[match.player1.tournamentPlayerId ?? '']} />
             <span
               className={`truncate text-sm font-medium ${p1Highlighted ? 'text-emerald-700' : 'text-slate-400'}`}
             >
@@ -379,7 +384,7 @@ export function PairingsTable({
             >
               {p2Name}
             </span>
-            <PlayerAvatar name={match.player2.name} avatarUrl={match.player2.avatarUrl} size="sm" />
+            <PlayerAvatar name={match.player2.name} avatarUrl={match.player2.avatarUrl} size="sm" ringColor={playerTeamColors?.[match.player2.tournamentPlayerId ?? '']} />
           </div>
           <WinnerMarker active={p2Highlighted} />
         </div>
@@ -463,7 +468,7 @@ export function PairingsTable({
                     {editor ? (
                       editor.p1Cell
                     ) : (
-                      <PlayerCell player={match.player1} align="left" isWinner={winner === 'p1'} />
+                      <PlayerCell player={match.player1} align="left" isWinner={winner === 'p1'} ringColor={playerTeamColors?.[match.player1.tournamentPlayerId ?? '']} />
                     )}
                   </td>
                   <td className="px-4 py-4 text-center">
@@ -473,7 +478,7 @@ export function PairingsTable({
                     {editor ? (
                       editor.p2Cell
                     ) : match.player2 ? (
-                      <PlayerCell player={match.player2} align="right" isWinner={winner === 'p2'} />
+                      <PlayerCell player={match.player2} align="right" isWinner={winner === 'p2'} ringColor={playerTeamColors?.[match.player2.tournamentPlayerId ?? '']} />
                     ) : (
                       <div className="flex items-center justify-end gap-2 text-sm text-slate-400">
                         <span>Bye</span>

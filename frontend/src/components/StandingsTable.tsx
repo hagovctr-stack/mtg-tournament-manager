@@ -9,6 +9,8 @@ interface StandingsTableProps {
   finishedRounds: number[]; // sorted list of round numbers that are FINISHED
   finished?: boolean;
   isTeamDraft?: boolean;
+  /** Map of tournamentPlayerId → hex pip color for team identity rings */
+  playerTeamColors?: Record<string, string>;
 }
 
 export function StandingsTable({
@@ -17,6 +19,7 @@ export function StandingsTable({
   finishedRounds,
   finished = false,
   isTeamDraft = false,
+  playerTeamColors,
 }: StandingsTableProps) {
   // null = "current" (latest), number = specific round
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
@@ -180,6 +183,7 @@ export function StandingsTable({
                           name={standing.player.name}
                           avatarUrl={standing.player.avatarUrl}
                           size="sm"
+                          ringColor={playerTeamColors?.[standing.tournamentPlayerId]}
                         />
                         {standing.player.name}
                       </Link>
@@ -189,6 +193,7 @@ export function StandingsTable({
                           name={standing.player.name}
                           avatarUrl={standing.player.avatarUrl}
                           size="sm"
+                          ringColor={playerTeamColors?.[standing.tournamentPlayerId]}
                         />
                         {standing.player.name}
                       </div>
